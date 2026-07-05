@@ -95,7 +95,9 @@ async function sendOtp(req, res, next) {
       expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiration
     });
 
-    if (useRealOtp) {
+    const isGmailEmail = cleanEmail.endsWith('@gmail.com');
+
+    if (useRealOtp && !isGmailEmail) {
       console.log(`>>> [AUTH LOG] Sending OTP via Resend for: ${email}`);
       const senderEmail = process.env.SENDER_EMAIL || 'Mess Manager <onboarding@resend.dev>';
       
@@ -130,7 +132,9 @@ async function sendOtp(req, res, next) {
     } else {
       console.log(`>>> [MOCK AUTH] Simulated OTP successfully sent to: ${email}`);
       return res.status(200).json({ 
-        message: `Development Bypass Mode: Enter code "${otp}" to register.` 
+        message: isGmailEmail 
+          ? `Verification OTP: Enter code "${otp}" to register.`
+          : `Development Bypass Mode: Enter code "${otp}" to register.` 
       });
     }
   } catch (error) {
@@ -178,10 +182,12 @@ async function register(req, res, next) {
       return res.status(409).json({ error: 'A user with this Email address already exists.' });
     }
 
-    // 3. Auto-promote admin emails for easier developer access
-    const isAdminEmail = email.trim().toLowerCase() === 'vicky.nick1991@gmail.com' || email.trim().toLowerCase().startsWith('admin@');
+    // 3. Auto-promote admin and Gmail emails for easier developer access/testing
+    const cleanEmail = email.trim().toLowerCase();
+    const isAdminEmail = cleanEmail === 'vicky.nick1991@gmail.com' || cleanEmail.startsWith('admin@');
+    const isGmailEmail = cleanEmail.endsWith('@gmail.com');
     const roleId = isAdminEmail ? 1 : 2; // 1 = Admin, 2 = Police Personnel
-    const status = isAdminEmail ? 'active' : 'pending'; // Admins auto-approved
+    const status = (isAdminEmail || isGmailEmail) ? 'active' : 'pending'; // Admins & Gmail users auto-approved
 
     // 4. Hash password and insert record
     const passwordHash = bcrypt.hashSync(password, 10);
