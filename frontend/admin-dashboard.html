@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UP Police Mess Management - Admin Control Panel</title>
   <link rel="stylesheet" href="style.css">
+  <!-- jsPDF for PDF generation -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- jsPDF-AutoTable plugin for tables in PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -67,9 +71,12 @@
 
         <!-- Tab 1: Personnel Approvals -->
         <div id="tabApprovals" class="tab-content active">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Pending Registrations</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 0;">Pending Registrations</h3>
+            <button onclick="exportTableToPDF('pendingUsersTable', 'pending_registrations.pdf', 'UP Police Mess - Pending Registrations')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <div class="table-responsive" style="margin-bottom: 2rem;">
-            <table>
+            <table id="pendingUsersTable">
               <thead>
                 <tr>
                   <th>Officer Name</th>
@@ -85,9 +92,12 @@
             </table>
           </div>
 
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Active Police Members</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 0;">Active Police Members</h3>
+            <button onclick="exportTableToPDF('activeUsersTable', 'active_members.pdf', 'UP Police Mess - Active Police Members')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <div class="table-responsive">
-            <table>
+            <table id="activeUsersTable">
               <thead>
                 <tr>
                   <th>Officer Name</th>
@@ -203,9 +213,12 @@
             </form>
           </div>
 
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Billing & Transactions Ledger</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 0;">Billing & Transactions Ledger</h3>
+            <button onclick="exportTableToPDF('adminBillsTable', 'billing_ledger.pdf', 'UP Police Mess - Billing Ledger')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <div class="table-responsive">
-            <table>
+            <table id="adminBillsTable">
               <thead>
                 <tr>
                   <th>Officer Name</th>
@@ -276,7 +289,10 @@
                 <label for="inputExportYear" class="form-label">Target Year</label>
                 <input type="number" id="inputExportYear" class="form-input" min="2020" max="2050" required>
               </div>
-              <button type="submit" class="btn btn-primary" style="width: 100%;">Download Attendance Log (CSV)</button>
+              <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">📄 Download CSV</button>
+                <button type="button" id="btnExportAttendancePdf" class="btn btn-secondary" style="flex: 1;">📕 Download PDF</button>
+              </div>
             </form>
           </div>
         </div>

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UP Police Mess Management - Personnel Portal</title>
   <link rel="stylesheet" href="style.css">
+  <!-- jsPDF for PDF generation -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <!-- jsPDF-AutoTable plugin for tables in PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -44,9 +48,12 @@
 
         <!-- Tab 1: Weekly Menu -->
         <div id="tabMenu" class="tab-content active">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Weekly Mess Menu</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 0;">Weekly Mess Menu</h3>
+            <button onclick="exportTableToPDF('personalMenuTable', 'weekly_menu.pdf', 'UP Police Mess - Weekly Menu')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <div class="table-responsive">
-            <table>
+            <table id="personalMenuTable">
               <thead>
                 <tr>
                   <th>Day</th>
@@ -91,9 +98,12 @@
             </form>
           </div>
 
-          <h4 style="margin: 2rem 0 1rem 0; color: var(--primary-color);">Recent Consumption History</h4>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem 0;">
+            <h4 style="color: var(--primary-color); margin-bottom: 0;">Recent Consumption History</h4>
+            <button onclick="exportTableToPDF('personalAttendanceHistoryTable', 'attendance_history.pdf', 'UP Police Mess - Recent Consumption History')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <div class="table-responsive">
-            <table>
+            <table id="personalAttendanceHistoryTable">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -111,12 +121,15 @@
 
         <!-- Tab 3: Billing & Payments -->
         <div id="tabBills" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Monthly Billing History</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="color: var(--primary-color); margin-bottom: 0;">Monthly Billing History</h3>
+            <button onclick="exportTableToPDF('personalBillsTable', 'billing_history.pdf', 'UP Police Mess - Monthly Billing History')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
+          </div>
           <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
             Review your dynamic monthly bill balances computed from your daily meal choices and set rates.
           </p>
           <div class="table-responsive">
-            <table>
+            <table id="personalBillsTable">
               <thead>
                 <tr>
                   <th>Billing Period</th>

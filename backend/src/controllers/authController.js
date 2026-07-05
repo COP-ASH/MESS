@@ -95,9 +95,7 @@ async function sendOtp(req, res, next) {
       expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiration
     });
 
-    const isGmailEmail = cleanEmail.endsWith('@gmail.com');
-
-    if (useRealOtp && !isGmailEmail) {
+    if (useRealOtp) {
       console.log(`>>> [AUTH LOG] Sending OTP via Resend for: ${email}`);
       const senderEmail = process.env.SENDER_EMAIL || 'Mess Manager <onboarding@resend.dev>';
       
@@ -123,18 +121,15 @@ async function sendOtp(req, res, next) {
         
         return res.status(200).json({ message: 'OTP sent successfully! Please check your email inbox.' });
       } catch (emailError) {
-        console.warn('>>> [AUTH WARNING] Resend dispatch failed. Falling back to client-side simulated code delivery:', emailError.message);
-        // Fallback: Return generated code directly in the alert message
-        return res.status(200).json({
-          message: `Resend unverified domain fallback: Enter code "${otp}" to register.`
+        console.error('>>> [AUTH ERROR] Resend dispatch failed:', emailError);
+        return res.status(500).json({
+          error: 'Failed to send OTP verification email. Please try again later or contact the administrator.'
         });
       }
     } else {
       console.log(`>>> [MOCK AUTH] Simulated OTP successfully sent to: ${email}`);
       return res.status(200).json({ 
-        message: isGmailEmail 
-          ? `Verification OTP: Enter code "${otp}" to register.`
-          : `Development Bypass Mode: Enter code "${otp}" to register.` 
+        message: `Development Bypass Mode: Enter code "${otp}" to register.` 
       });
     }
   } catch (error) {

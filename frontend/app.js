@@ -944,6 +944,24 @@ function initExportsSection() {
     const exportUrl = `${BACKEND_BASE_URL}/api/users/export-attendance?month=${month}&year=${year}&token=${token}`;
     window.location.href = exportUrl;
   });
+
+  const btnPdf = document.getElementById('btnExportAttendancePdf');
+  if (btnPdf) {
+    btnPdf.addEventListener('click', async () => {
+      const month = document.getElementById('selectExportMonth').value;
+      const year = document.getElementById('inputExportYear').value;
+      
+      btnPdf.disabled = true;
+      const originalText = btnPdf.innerText;
+      btnPdf.innerText = 'Generating PDF...';
+      try {
+        await downloadAttendancePDF(month, year);
+      } finally {
+        btnPdf.disabled = false;
+        btnPdf.innerText = originalText;
+      }
+    });
+  }
 }
 
 /* ==========================================================================
@@ -958,4 +976,90 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/**
+ * Export HTML table to PDF using jsPDF and jsPDF-AutoTable
+ */
+function exportTableToPDF(tableId, filename, titleText) {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.setTextColor(11, 34, 64); // --primary-color (Steel Navy Blue)
+    doc.text(titleText, 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // --text-secondary
+    doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 28);
+    
+    // Use autotable to render table, ignoring columns containing buttons/actions if present
+    doc.autoTable({
+      html: `#${tableId}`,
+      startY: 32,
+      theme: 'grid',
+      headStyles: { fillColor: [11, 34, 64] }, // Steel Navy
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { top: 30 },
+      didParseCell: function(data) {
+        // Remove button elements text from output PDF cells
+        if (data.cell.raw && data.cell.raw.innerHTML && data.cell.raw.innerHTML.includes('<button')) {
+          data.cell.text = '';
+        }
+      }
+    });
+    
+    doc.save(filename);
+  } catch (err) {
+    console.error('Failed to export PDF:', err);
+    alert('Failed to generate PDF. Make sure jsPDF script dependencies are loaded.');
+  }
+}
+window.exportTableToPDF = exportTableToPDF; // make it globally accessible
+
+async function downloadAttendancePDF(month, year) {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users/export-attendance?month=${month}&year=${year}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!response.ok) throw new Error('Failed to fetch attendance data.');
+    const csvText = await response.text();
+    
+    // Parse CSV into rows and cells
+    const rows = csvText.split('\n')
+      .map(row => row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim()))
+      .filter(row => row.length > 1 && row[0].toLowerCase() !== 'id'); // skip headers and empty rows
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.setTextColor(11, 34, 64);
+    doc.text(`UP Police Mess - Monthly Attendance Report (${month}/${year})`, 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 28);
+    
+    // AutoTable layout
+    doc.autoTable({
+      head: [['ID', 'Date', 'Officer Name', 'PNO', 'Rank', 'Posting Unit', 'Breakfast', 'Lunch', 'Dinner']],
+      body: rows,
+      startY: 32,
+      theme: 'grid',
+      headStyles: { fillColor: [11, 34, 64] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { top: 30 }
+    });
+    
+    doc.save(`attendance_report_${month}_${year}.pdf`);
+  } catch (err) {
+    showNotification(`PDF export failed: ${err.message}`, 'error');
+  }
 }
