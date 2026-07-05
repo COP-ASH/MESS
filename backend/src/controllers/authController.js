@@ -54,16 +54,20 @@ function verifyStoredOtp(email, token) {
   return false;
 }
 
-/**
- * Helper to check if an email is authorized in the whitelist
- */
 function isEmailAuthorized(email) {
+  const cleanEmail = email.trim().toLowerCase();
+  
+  // Allow all Gmail accounts automatically
+  if (cleanEmail.endsWith('@gmail.com')) {
+    return true;
+  }
+
   const allowedEmailsStr = process.env.ALLOWED_EMAILS || '';
   if (!allowedEmailsStr) {
-    return true; // No restrictions in development
+    return true; // No restrictions if not configured
   }
   const allowedEmails = allowedEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  return allowedEmails.includes(email.trim().toLowerCase());
+  return allowedEmails.includes(cleanEmail);
 }
 
 /**
