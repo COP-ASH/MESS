@@ -30,6 +30,15 @@
 
       <form id="loginForm">
         
+        <!-- Role Selection Field -->
+        <div class="form-group">
+          <label for="selectRole" class="form-label">Select Portal Access Role</label>
+          <select id="selectRole" required>
+            <option value="Personnel" selected>Police Personnel / Other Users</option>
+            <option value="Admin">Mess Manager (Admin)</option>
+          </select>
+        </div>
+        
         <!-- Login ID Field -->
         <div class="form-group">
           <label for="inputLoginId" class="form-label">Police Personal Number (PNO) or Email</label>
