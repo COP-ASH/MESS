@@ -116,14 +116,24 @@ async function sendOtp(req, res, next) {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Resend API error: ${errorText}`);
+          let apiErrorMessage = errorText;
+          try {
+            const parsed = JSON.parse(errorText);
+            if (parsed.message) {
+              apiErrorMessage = parsed.message;
+            }
+          } catch (_) {}
+          
+          return res.status(response.status).json({
+            error: `Failed to send OTP verification email. ${apiErrorMessage}`
+          });
         }
         
         return res.status(200).json({ message: 'OTP sent successfully! Please check your email inbox.' });
       } catch (emailError) {
         console.error('>>> [AUTH ERROR] Resend dispatch failed:', emailError);
         return res.status(500).json({
-          error: 'Failed to send OTP verification email. Please try again later or contact the administrator.'
+          error: `Failed to send OTP verification email. ${emailError.message || 'Please try again later or contact the administrator.'}`
         });
       }
     } else {
