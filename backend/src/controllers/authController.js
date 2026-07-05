@@ -87,40 +87,50 @@ async function sendOtp(req, res, next) {
       return res.status(403).json({ error: 'This email address is not authorized for Mess System registration.' });
     }
 
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const cleanEmail = email.trim().toLowerCase();
+    
+    activeOtps.set(cleanEmail, {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiration
+    });
+
     if (useRealOtp) {
       console.log(`>>> [AUTH LOG] Sending OTP via Resend for: ${email}`);
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      activeOtps.set(email.trim().toLowerCase(), {
-        otp,
-        expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiration
-      });
-
       const senderEmail = process.env.SENDER_EMAIL || 'Mess Manager <onboarding@resend.dev>';
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: senderEmail,
-          to: [email.trim().toLowerCase()],
-          subject: 'UP Police Mess Management - Registration OTP',
-          html: `<h3>UP Police Mess Verification</h3><p>Your registration OTP is <strong>${otp}</strong>.</p><p>This code is valid for 5 minutes.</p>`
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Resend API error: ${errorText}`);
-      }
       
-      return res.status(200).json({ message: 'OTP sent successfully! Please check your email inbox.' });
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: senderEmail,
+            to: [cleanEmail],
+            subject: 'UP Police Mess Management - Registration OTP',
+            html: `<h3>UP Police Mess Verification</h3><p>Your registration OTP is <strong>${otp}</strong>.</p><p>This code is valid for 5 minutes.</p>`
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Resend API error: ${errorText}`);
+        }
+        
+        return res.status(200).json({ message: 'OTP sent successfully! Please check your email inbox.' });
+      } catch (emailError) {
+        console.warn('>>> [AUTH WARNING] Resend dispatch failed. Falling back to client-side simulated code delivery:', emailError.message);
+        // Fallback: Return generated code directly in the alert message
+        return res.status(200).json({
+          message: `Resend unverified domain fallback: Enter code "${otp}" to register.`
+        });
+      }
     } else {
       console.log(`>>> [MOCK AUTH] Simulated OTP successfully sent to: ${email}`);
       return res.status(200).json({ 
-        message: 'Development Bypass Mode: Enter any 6-digit code (e.g., 123456).' 
+        message: `Development Bypass Mode: Enter code "${otp}" to register.` 
       });
     }
   } catch (error) {
