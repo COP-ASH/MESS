@@ -28,8 +28,8 @@ const corsOptions = {
     // Check if origin is localhost/127.0.0.1
     const isLocalhost = origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
     
-    // Check if origin matches GitHub Pages (https://<username>.github.io)
-    const isGitHubPages = origin.includes('.github.io');
+    // Check if origin matches GitHub Pages or custom domains (copash.shop, copash.space)
+    const isGitHubPages = origin.includes('.github.io') || origin.includes('copash.shop') || origin.includes('copash.space');
     
     if (isLocalhost || isGitHubPages || allowedOrigins.includes(origin)) {
       callback(null, true);
