@@ -87,5 +87,4 @@ app.listen(PORT, () => {
   console.log(`>>> [SERVER URL] Local URL: http://localhost:${PORT}`);
   console.log(`>>> [ALLOWED ORIGINS] config loaded for: ${allowedOrigins.join(', ')} and GitHub Pages (.github.io)`);
 });
-// Trigger nodemon reload again
-
+// Trigger nodemon reload again (updated sender to root domain)
