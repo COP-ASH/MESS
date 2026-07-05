@@ -110,25 +110,38 @@
           <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Update Mess Menu</h3>
           <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
             <form id="updateMenuForm">
-              <div class="form-group" style="max-width: 250px;">
-                <label for="selectMenuDay" class="form-label">Select Day</label>
-                <select id="selectMenuDay" required>
-                  <!-- Loaded dynamically -->
-                </select>
+              <div style="display: flex; gap: 1.5rem; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0;">
+                  <label for="selectMenuDay" class="form-label" style="font-weight: 700;">Select Day to Update</label>
+                  <select id="selectMenuDay" style="padding: 0.8rem; font-size: 1rem; border: 2px solid var(--accent-color); border-radius: var(--radius-sm);" required>
+                    <!-- Loaded dynamically -->
+                  </select>
+                </div>
+                <div style="flex: 2; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; min-width: 300px;">
+                  💡 Select a day from the dropdown to automatically load that day's breakfast, lunch, and dinner menus. Make any edits and click Save.
+                </div>
               </div>
-              <div class="form-group">
-                <label for="inputMenuBreakfast" class="form-label">Breakfast Menu</label>
-                <input type="text" id="inputMenuBreakfast" class="form-input" required>
+              
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                <div class="form-group">
+                  <label for="inputMenuBreakfast" class="form-label" style="font-weight: 600;">Breakfast Menu</label>
+                  <input type="text" id="inputMenuBreakfast" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Aloo Paratha, Curd" required>
+                </div>
+                <div class="form-group">
+                  <label for="inputMenuLunch" class="form-label" style="font-weight: 600;">Lunch Menu</label>
+                  <input type="text" id="inputMenuLunch" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Rajma, Rice, Roti, Salad" required>
+                </div>
+                <div class="form-group">
+                  <label for="inputMenuDinner" class="form-label" style="font-weight: 600;">Dinner Menu</label>
+                  <input type="text" id="inputMenuDinner" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Paneer Masala, Roti, Dal, Sweets" required>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="inputMenuLunch" class="form-label">Lunch Menu</label>
-                <input type="text" id="inputMenuLunch" class="form-input" required>
+              
+              <div style="display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.8rem 2rem; font-size: 1rem; border-radius: var(--radius-sm); font-weight: 600;">
+                  💾 Save Menu Changes
+                </button>
               </div>
-              <div class="form-group">
-                <label for="inputMenuDinner" class="form-label">Dinner Menu</label>
-                <input type="text" id="inputMenuDinner" class="form-input" required>
-              </div>
-              <button type="submit" class="btn btn-primary">Save Menu Changes</button>
             </form>
           </div>
         </div>

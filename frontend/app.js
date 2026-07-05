@@ -381,26 +381,26 @@ async function loadWeeklyMenu() {
     if (!response.ok) throw new Error(data.error);
 
     const tbody = document.getElementById('menuTableBody');
-    if (!tbody) return;
+    if (tbody) {
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const todayIndex = new Date().getDay();
+      const todayName = daysOfWeek[todayIndex];
 
-    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const todayIndex = new Date().getDay();
-    const todayName = daysOfWeek[todayIndex];
-
-    tbody.innerHTML = data.map(day => {
-      const isToday = day.dayOfWeek.toLowerCase() === todayName.toLowerCase();
-      const rowStyle = isToday ? 'style="background-color: rgba(207, 161, 64, 0.15); font-weight: 600;"' : '';
-      const todayIndicator = isToday ? ' <span class="badge badge-warning">Today</span>' : '';
-      
-      return `
-        <tr ${rowStyle}>
-          <td>${day.dayOfWeek}${todayIndicator}</td>
-          <td>${day.breakfast}</td>
-          <td>${day.lunch}</td>
-          <td>${day.dinner}</td>
-        </tr>
-      `;
-    }).join('');
+      tbody.innerHTML = data.map(day => {
+        const isToday = day.dayOfWeek.toLowerCase() === todayName.toLowerCase();
+        const rowStyle = isToday ? 'style="background-color: rgba(207, 161, 64, 0.15); font-weight: 600;"' : '';
+        const todayIndicator = isToday ? ' <span class="badge badge-warning">Today</span>' : '';
+        
+        return `
+          <tr ${rowStyle}>
+            <td>${day.dayOfWeek}${todayIndicator}</td>
+            <td>${day.breakfast}</td>
+            <td>${day.lunch}</td>
+            <td>${day.dinner}</td>
+          </tr>
+        `;
+      }).join('');
+    }
 
     // If we're on the admin dashboard, also load selectMenuDay dropdown
     const selectMenuDay = document.getElementById('selectMenuDay');
