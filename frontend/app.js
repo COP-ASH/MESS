@@ -1008,6 +1008,19 @@ function exportTableToPDF(tableId, filename, titleText) {
         if (data.cell.raw && data.cell.raw.innerHTML && data.cell.raw.innerHTML.includes('<button')) {
           data.cell.text = '';
         }
+        
+        // Remove emoji characters to prevent garbled PDF encoding (e.g. 'L& &N&o or '&& &Y&e&s)
+        if (data.cell.text) {
+          const cleanText = (str) => {
+            if (typeof str !== 'string') return str;
+            return str.replace(/[✅❌]/g, '').trim();
+          };
+          if (Array.isArray(data.cell.text)) {
+            data.cell.text = data.cell.text.map(cleanText);
+          } else {
+            data.cell.text = cleanText(data.cell.text);
+          }
+        }
       }
     });
     
