@@ -324,6 +324,12 @@ async function loadUserProfile() {
     // Populate header details
     document.getElementById('userRankPno').innerText = `Designation/Rank: ${data.rank} | Personal Number (PNO): ${data.pno} | Unit: ${data.postingUnit}`;
     
+    // Also update welcome message to avoid undefined rank display
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    if (welcomeMessage) {
+      welcomeMessage.innerText = `Welcome, ${data.rank} ${data.name}`;
+    }
+    
     // Fill Profile update form
     document.getElementById('profileName').value = data.name;
     document.getElementById('profileRank').value = data.rank;

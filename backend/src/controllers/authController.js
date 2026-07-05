@@ -288,6 +288,7 @@ async function login(req, res, next) {
         id: user.id,
         name: user.name,
         email: user.email,
+        rank: user.rank,
         roleName
       }
     });
