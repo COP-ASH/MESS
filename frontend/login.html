@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UP Police Mess Management - Login</title>
+  <meta name="description" content="Secure portal login for Uttar Pradesh Police Mess Management.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <nav class="navbar" aria-label="Main Navigation">
+      <div class="nav-brand">UP POLICE MESS MANAGER</div>
+    </nav>
+  </header>
+
+  <!-- Main Body Content -->
+  <main>
+    <section class="glass-panel form-card">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span style="font-size: 3rem;">👮</span>
+      </div>
+      <h2>Portal Secure Login</h2>
+      <p class="subtitle">Enter your Police PNO or Email Address to access the Mess Manager</p>
+
+      <!-- Dynamic alert messages -->
+      <div id="statusMessage" class="message" style="display: none;" role="alert"></div>
+
+      <form id="loginForm">
+        
+        <!-- Login ID Field -->
+        <div class="form-group">
+          <label for="inputLoginId" class="form-label">Police Personal Number (PNO) or Email</label>
+          <input type="text" id="inputLoginId" class="form-input" placeholder="e.g. 1859666 or vicky@copash.shop" required>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label for="inputPassword" class="form-label">Password</label>
+          <input type="password" id="inputPassword" class="form-input" placeholder="Enter secure password" required>
+        </div>
+
+        <button type="submit" id="btnLogin" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+          Log In securely
+        </button>
+
+        <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+          <span style="color: var(--text-secondary);">New Mess Registration?</span> 
+          <a href="register.html" style="color: var(--secondary-color); font-weight: 600; text-decoration: none;">Sign Up Here</a>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Sticky Footer -->
+  <footer>
+    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Built with Antigravity IDE. All rights reserved.</p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Clear token on loading login page
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    });
+  </script>
+</body>
+</html>

@@ -13,6 +13,26 @@ const pool = new Pool({
 
 const db = drizzle(pool, { schema });
 
+// Auto-seed database tables on startup
+async function seedDatabase() {
+  try {
+    const rolesList = await db.select().from(schema.roles);
+    if (rolesList.length === 0) {
+      console.log('>>> [DB SEED] Seeding default roles...');
+      await db.insert(schema.roles).values([
+        { id: 1, name: 'Admin' },
+        { id: 2, name: 'Police Personnel' }
+      ]);
+      console.log('>>> [DB SEED] Default roles seeded successfully.');
+    }
+  } catch (err) {
+    console.error('>>> [DB SEED ERROR] Failed to seed database:', err);
+  }
+}
+
+// Trigger database seeding asynchronously
+seedDatabase();
+
 module.exports = {
   db,
   pool

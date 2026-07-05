@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UP Police Mess Management - Personnel Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <nav class="navbar" aria-label="Main Navigation">
+      <div class="nav-brand" id="userBrandHeader">UP Police Mess</div>
+      <ul class="nav-links">
+        <li><a href="#" class="active">Dashboard</a></li>
+        <li><button id="btnLogout" class="btn btn-logout">Logout</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Main Body Content -->
+  <main>
+    <!-- Welcome Header banner -->
+    <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem; border-left: 5px solid var(--accent-color);">
+      <h3 style="color: var(--primary-color);" id="welcomeMessage">Welcome, Officer</h3>
+      <p style="color: var(--text-secondary); font-size: 0.9rem;" id="userRankPno">Rank: PNO: </p>
+    </div>
+
+    <!-- Main Grid Layout -->
+    <div class="dashboard-grid">
+      
+      <!-- Left Column: Attendance, Menu and Billing -->
+      <div class="col-8">
+        
+        <!-- Tabbed Container -->
+        <div class="tab-container">
+          <button class="tab-btn active" onclick="switchTab('tabMenu')">Weekly Menu</button>
+          <button class="tab-btn" onclick="switchTab('tabAttendance')">Mark Attendance</button>
+          <button class="tab-btn" onclick="switchTab('tabBills')">Billing & Payments</button>
+        </div>
+
+        <div id="statusMessage" class="message" style="display: none;" role="alert"></div>
+
+        <!-- Tab 1: Weekly Menu -->
+        <div id="tabMenu" class="tab-content active">
+          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Weekly Mess Menu</h3>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Breakfast</th>
+                  <th>Lunch</th>
+                  <th>Dinner</th>
+                </tr>
+              </thead>
+              <tbody id="menuTableBody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Mark Attendance -->
+        <div id="tabAttendance" class="tab-content">
+          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Log Daily Meals</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+            Please check the checkboxes for the meals you will consume for the selected date. You can update your choices at any time.
+          </p>
+          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
+            <form id="attendanceForm">
+              <div class="form-group" style="max-width: 250px;">
+                <label for="inputAttendanceDate" class="form-label">Select Date</label>
+                <input type="date" id="inputAttendanceDate" class="form-input" required>
+              </div>
+
+              <div style="display: flex; gap: 2rem; margin: 1.5rem 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                  <input type="checkbox" id="checkBreakfast" style="width: 18px; height: 18px;"> Breakfast
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                  <input type="checkbox" id="checkLunch" style="width: 18px; height: 18px;"> Lunch
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                  <input type="checkbox" id="checkDinner" style="width: 18px; height: 18px;"> Dinner
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary">Log Attendance</button>
+            </form>
+          </div>
+
+          <h4 style="margin: 2rem 0 1rem 0; color: var(--primary-color);">Recent Consumption History</h4>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Breakfast</th>
+                  <th>Lunch</th>
+                  <th>Dinner</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceHistoryBody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 3: Billing & Payments -->
+        <div id="tabBills" class="tab-content">
+          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Monthly Billing History</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
+            Review your dynamic monthly bill balances computed from your daily meal choices and set rates.
+          </p>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Billing Period</th>
+                  <th>Total Meals</th>
+                  <th>Total Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="billsTableBody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Profile & Official Notices -->
+      <div class="col-4" style="display: flex; flex-direction: column; gap: 2rem;">
+        
+        <!-- Personal Profile Card -->
+        <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
+          <h3 style="margin-bottom: 1.25rem; color: var(--primary-color);">Update Profile Details</h3>
+          <form id="profileForm">
+            <div class="form-group">
+              <label for="profileName" class="form-label">Full Name</label>
+              <input type="text" id="profileName" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="profileRank" class="form-label">Rank</label>
+              <select id="profileRank" required>
+                <option value="Constable">Constable</option>
+                <option value="Head Constable">Head Constable</option>
+                <option value="Sub-Inspector">Sub-Inspector</option>
+                <option value="Inspector">Inspector</option>
+                <option value="Mess Staff">Mess Staff</option>
+                <option value="Admin">Admin / Mess In-Charge</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="profilePostingUnit" class="form-label">Posting Unit</label>
+              <input type="text" id="profilePostingUnit" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="profileMobile" class="form-label">Mobile Number</label>
+              <input type="text" id="profileMobile" class="form-input" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Save Changes</button>
+          </form>
+        </div>
+
+        <!-- Official Notices Feed -->
+        <div class="notice-board">
+          <h3 style="margin-bottom: 1rem; color: var(--primary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 0.5rem;">
+            📢 Official Mess Board
+          </h3>
+          <div id="noticesFeed">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Sticky Footer -->
+  <footer>
+    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Built with Antigravity IDE. All rights reserved.</p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    // Tab switching function
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+    }
+  </script>
+</body>
+</html>

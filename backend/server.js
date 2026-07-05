@@ -4,6 +4,10 @@ const cors = require('cors');
 const morgan = require('morgan');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const menuRoutes = require('./src/routes/menuRoutes');
+const attendanceRoutes = require('./src/routes/attendanceRoutes');
+const billRoutes = require('./src/routes/billRoutes');
+const noticeRoutes = require('./src/routes/noticeRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,12 +55,16 @@ app.use(morgan('dev'));
 // 4. API Routes Mapping
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/menu', menuRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/bills', billRoutes);
+app.use('/api/notices', noticeRoutes);
 
 // 5. Default root path check (for health checks / Render deployment verify)
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'online',
-    message: 'Mess Management API is operational.',
+    message: 'UP Police Mess Management API is operational.',
     timestamp: new Date().toISOString()
   });
 });

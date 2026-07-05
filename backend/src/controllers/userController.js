@@ -1,97 +1,192 @@
 const { db } = require('../db/index');
-const { users } = require('../db/schema');
-const { useRealOtp, verifyStoredOtp, isEmailAuthorized } = require('./authController');
+const { policeUsers, roles, mealAttendance } = require('../db/schema');
+const { eq, and, sql } = require('drizzle-orm');
+const { logAudit } = require('../utils/logger');
 
 /**
- * Controller to create a new user record after verifying OTP
+ * Fetch profile of currently logged-in user
  */
-async function createUser(req, res, next) {
-  console.log('>>> [CONTROLLER ENTRY] userController.createUser - Params:', req.body);
-
-  const { name, pno, mobile, email, otp } = req.body;
-
+async function getProfile(req, res, next) {
+  const userId = req.user.id;
   try {
-    // 1. Validation Segment
-    console.log('>>> [LOGICAL SEGMENT - VALIDATION] Validating required parameters...');
-    if (!name || !pno || !mobile || !email || !otp) {
-      console.log('>>> [CONTROLLER EXIT] userController.createUser - Error: Missing parameters');
-      return res.status(400).json({ error: 'All fields (Name, PNO, Mobile, Email, and OTP) are required.' });
+    const [user] = await db.select({
+      id: policeUsers.id,
+      name: policeUsers.name,
+      pno: policeUsers.pno,
+      rank: policeUsers.rank,
+      postingUnit: policeUsers.postingUnit,
+      mobile: policeUsers.mobile,
+      email: policeUsers.email,
+      status: policeUsers.status,
+      createdAt: policeUsers.createdAt
+    })
+    .from(policeUsers)
+    .where(eq(policeUsers.id, userId));
+
+    if (!user) {
+      return res.status(404).json({ error: 'User profile not found.' });
     }
 
-    if (!isEmailAuthorized(email)) {
-      console.log(`>>> [CONTROLLER EXIT] userController.createUser - Error: Unauthorized email ${email}`);
-      return res.status(403).json({ error: 'This email is not authorized to register.' });
-    }
-
-    // 2. Authentication Segment
-    console.log('>>> [LOGICAL SEGMENT - OTP VERIFICATION] Verifying OTP...');
-    if (useRealOtp) {
-      const isValid = verifyStoredOtp(email, otp);
-      if (!isValid) {
-        console.log('>>> [CONTROLLER EXIT] userController.createUser - Error: OTP invalid or expired');
-        return res.status(401).json({ error: 'OTP verification failed. Invalid or expired OTP code.' });
-      }
-      console.log('>>> [LOGICAL SEGMENT - OTP VERIFICATION] OTP successfully verified.');
-    } else {
-      console.log('>>> [MOCK VERIFICATION] Verifying simulated OTP...');
-      if (otp.length < 4) {
-        console.log('>>> [CONTROLLER EXIT] userController.createUser - Error: Mock OTP too short');
-        return res.status(401).json({ error: 'OTP must be at least 4 digits.' });
-      }
-      console.log('>>> [MOCK VERIFICATION] Simulated OTP successfully verified.');
-    }
-
-    // 3. Database Insertion Segment
-    console.log('>>> [LOGICAL SEGMENT - DB INSERTION] Inserting user via Drizzle ORM...');
-    try {
-      const insertedUsers = await db.insert(users).values({
-        name,
-        pno,
-        mobile,
-        email
-      }).returning();
-
-      console.log('>>> [DB SUCCESS] Record inserted successfully:', insertedUsers[0]);
-      console.log('>>> [CONTROLLER EXIT] userController.createUser - Status: Success');
-      return res.status(201).json({
-        message: 'Registration successful!',
-        user: insertedUsers[0]
-      });
-    } catch (dbError) {
-      // Check for PostgreSQL Unique Constraint Violation (PNO must be unique)
-      if (dbError.code === '23505') {
-        console.warn(`>>> [DB WARNING] Unique constraint violation on pno: ${pno}`);
-        console.log('>>> [CONTROLLER EXIT] userController.createUser - Error: PNO already exists');
-        return res.status(409).json({ error: 'A user with this Personal Number (PNO) already exists.' });
-      }
-      throw dbError;
-    }
+    return res.status(200).json(user);
   } catch (error) {
-    console.error('>>> [CONTROLLER ERROR] userController.createUser failed:', error);
+    console.error('>>> [CONTROLLER ERROR] userController.getProfile failed:', error);
     next(error);
   }
 }
 
 /**
- * Controller to fetch all user records
+ * Update personal profile details
  */
-async function getUsers(req, res, next) {
-  console.log('>>> [CONTROLLER ENTRY] userController.getUsers');
+async function updateProfile(req, res, next) {
+  console.log('>>> [CONTROLLER ENTRY] userController.updateProfile - Params:', req.body);
+  const { name, rank, postingUnit, mobile } = req.body;
+  const userId = req.user.id;
 
   try {
-    console.log('>>> [LOGICAL SEGMENT - DB FETCH] Fetching users list via Drizzle ORM...');
-    const usersList = await db.select().from(users);
-    
-    console.log(`>>> [DB SUCCESS] Fetched ${usersList.length} users successfully.`);
-    console.log('>>> [CONTROLLER EXIT] userController.getUsers - Status: Success');
-    return res.status(200).json(usersList);
+    if (!name || !rank || !postingUnit || !mobile) {
+      return res.status(400).json({ error: 'Name, Rank, Posting Unit, and Mobile Number are required.' });
+    }
+
+    const [updated] = await db.update(policeUsers)
+      .set({
+        name: name.trim(),
+        rank: rank.trim(),
+        postingUnit: postingUnit.trim(),
+        mobile: mobile.trim()
+      })
+      .where(eq(policeUsers.id, userId))
+      .returning();
+
+    await logAudit(userId, 'UPDATE_PROFILE', 'Updated profile details (name, rank, unit, mobile).');
+
+    return res.status(200).json({ message: 'Profile updated successfully!', user: updated });
   } catch (error) {
-    console.error('>>> [CONTROLLER ERROR] userController.getUsers failed:', error);
+    console.error('>>> [CONTROLLER ERROR] userController.updateProfile failed:', error);
+    next(error);
+  }
+}
+
+/**
+ * Fetch all registered users by status (Admin only)
+ */
+async function getUsersList(req, res, next) {
+  const statusFilter = req.query.status || 'active'; // 'active', 'pending', 'deactivated'
+  try {
+    const list = await db.select({
+      id: policeUsers.id,
+      name: policeUsers.name,
+      pno: policeUsers.pno,
+      rank: policeUsers.rank,
+      postingUnit: policeUsers.postingUnit,
+      mobile: policeUsers.mobile,
+      email: policeUsers.email,
+      status: policeUsers.status,
+      createdAt: policeUsers.createdAt,
+      roleName: roles.name
+    })
+    .from(policeUsers)
+    .leftJoin(roles, eq(policeUsers.roleId, roles.id))
+    .where(eq(policeUsers.status, statusFilter))
+    .orderBy(sql`${policeUsers.createdAt} DESC`);
+
+    return res.status(200).json(list);
+  } catch (error) {
+    console.error('>>> [CONTROLLER ERROR] userController.getUsersList failed:', error);
+    next(error);
+  }
+}
+
+/**
+ * Approve or deactivate user (Admin only)
+ */
+async function updateUserStatus(req, res, next) {
+  console.log('>>> [CONTROLLER ENTRY] userController.updateUserStatus - Params:', req.body);
+  const { userId, status } = req.body; // status: 'active', 'deactivated'
+  const adminId = req.user.id;
+
+  try {
+    if (!userId || !status) {
+      return res.status(400).json({ error: 'User ID and Status are required.' });
+    }
+
+    if (!['active', 'deactivated'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value. Must be active or deactivated.' });
+    }
+
+    const [updated] = await db.update(policeUsers)
+      .set({ status })
+      .where(eq(policeUsers.id, userId))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    await logAudit(adminId, 'UPDATE_USER_STATUS', `Set status of User #${userId} to "${status}"`);
+
+    return res.status(200).json({ message: `User account is now ${status}.`, user: updated });
+  } catch (error) {
+    console.error('>>> [CONTROLLER ERROR] userController.updateUserStatus failed:', error);
+    next(error);
+  }
+}
+
+/**
+ * Export attendance records as CSV (Admin only)
+ */
+async function exportAttendanceCsv(req, res, next) {
+  const { month, year } = req.query;
+  const adminId = req.user.id;
+
+  try {
+    if (!month || !year) {
+      return res.status(400).json({ error: 'Month and Year parameters are required for export.' });
+    }
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+
+    const records = await db.select({
+      id: mealAttendance.id,
+      date: mealAttendance.date,
+      userName: policeUsers.name,
+      pno: policeUsers.pno,
+      rank: policeUsers.rank,
+      postingUnit: policeUsers.postingUnit,
+      breakfast: mealAttendance.breakfast,
+      lunch: mealAttendance.lunch,
+      dinner: mealAttendance.dinner
+    })
+    .from(mealAttendance)
+    .leftJoin(policeUsers, eq(mealAttendance.userId, policeUsers.id))
+    .where(
+      and(
+        sql`${mealAttendance.date} >= ${startDate}`,
+        sql`${mealAttendance.date} <= ${endDate}`
+      )
+    )
+    .orderBy(sql`${mealAttendance.date} ASC`);
+
+    let csvContent = 'ID,Date,Officer Name,PNO,Rank,Posting Unit,Breakfast,Lunch,Dinner\n';
+    records.forEach(r => {
+      csvContent += `${r.id},${r.date},"${r.userName}",${r.pno},"${r.rank}","${r.postingUnit}",${r.breakfast ? 'Yes' : 'No'},${r.lunch ? 'Yes' : 'No'},${r.dinner ? 'Yes' : 'No'}\n`;
+    });
+
+    await logAudit(adminId, 'EXPORT_ATTENDANCE', `Exported attendance report for ${month}/${year}`);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_report_${month}_${year}.csv"`);
+    return res.status(200).send(csvContent);
+  } catch (error) {
+    console.error('>>> [CONTROLLER ERROR] userController.exportAttendanceCsv failed:', error);
     next(error);
   }
 }
 
 module.exports = {
-  createUser,
-  getUsers
+  getProfile,
+  updateProfile,
+  getUsersList,
+  updateUserStatus,
+  exportAttendanceCsv
 };

@@ -1,11 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
 
-// Route to get all users
-router.get('/', userController.getUsers);
+// Get personal user profile
+router.get('/profile', authenticateToken, userController.getProfile);
 
-// Route to create a new user (with OTP verification validation)
-router.post('/', userController.createUser);
+// Update profile details
+router.post('/profile', authenticateToken, userController.updateProfile);
+
+// List users (Admin only)
+router.get('/list', authenticateToken, requireRole('Admin'), userController.getUsersList);
+
+// Set status (Admin only)
+router.post('/status', authenticateToken, requireRole('Admin'), userController.updateUserStatus);
+
+// Export attendance report as CSV (Admin only)
+router.get('/export-attendance', authenticateToken, requireRole('Admin'), userController.exportAttendanceCsv);
 
 module.exports = router;

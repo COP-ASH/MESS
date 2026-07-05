@@ -1,35 +1,73 @@
 /**
  * ==========================================================================
- * Mess Management Software - Frontend Scripts
+ * UP Police Mess Management - Core Frontend Scripts
  * ==========================================================================
  */
 
-// Toggle backend API base URL for easy switching between Local and Production (Render)
 const BACKEND_BASE_URL = "http://localhost:5000";
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('>>> [INIT] Application initialized. Base URL:', BACKEND_BASE_URL);
 
-  // Initialize page-specific scripts
-  if (document.getElementById('registrationForm')) {
-    initRegistrationPage();
+  // Setup Global Logout Button
+  const btnLogout = document.getElementById('btnLogout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', logout);
   }
-  
-  if (document.getElementById('usersTable')) {
-    initDataViewPage();
+
+  // Route page actions
+  if (document.getElementById('loginForm')) {
+    initLoginPage();
+  } else if (document.getElementById('registrationForm')) {
+    initRegisterPage();
+  } else if (document.getElementById('userBrandHeader')) {
+    initPersonnelDashboard();
+  } else if (document.getElementById('adminBillsTableBody')) {
+    initAdminDashboard();
   }
 });
 
 /* ==========================================================================
-   Voice Recognition / Speech API Helper
+   Helper Functions (Security & Notifications)
+   ========================================================================== */
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+}
+
+function showNotification(message, type = 'info', duration = 4000) {
+  const statusMessage = document.getElementById('statusMessage');
+  if (!statusMessage) return;
+
+  statusMessage.className = `message message-${type}`;
+  statusMessage.innerText = message;
+  statusMessage.style.display = 'block';
+
+  if (duration > 0) {
+    setTimeout(() => {
+      statusMessage.style.display = 'none';
+    }, duration);
+  }
+}
+
+function logout() {
+  console.log('>>> [LOGOUT] Ending session.');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+
+/* ==========================================================================
+   Voice Dictation Speech API helper
    ========================================================================== */
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const isSpeechSupported = !!SpeechRecognition;
 
-/**
- * Attaches speech recognition to a target input and toggle button
- */
 function setupVoiceField(buttonId, inputId) {
   const btn = document.getElementById(buttonId);
   const input = document.getElementById(inputId);
@@ -37,64 +75,54 @@ function setupVoiceField(buttonId, inputId) {
   if (!btn || !input) return;
 
   if (!isSpeechSupported) {
-    // Hide mic dictation buttons if browser doesn't support Web Speech API
     btn.style.display = 'none';
-    console.warn(`[Speech API] Speech recognition is not supported in this browser for #${inputId}`);
+    console.warn(`[Speech API] Dictation not supported in browser for #${inputId}`);
     return;
   }
 
   const recognition = new SpeechRecognition();
   recognition.continuous = false;
-  recognition.lang = 'en-US';
+  recognition.lang = 'en-IN'; // Optimized for Indian English
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
   btn.addEventListener('click', (e) => {
     e.preventDefault();
-    
-    // Toggle active state
     if (btn.classList.contains('listening')) {
       recognition.stop();
       return;
     }
 
-    // Stop other active listeners
-    document.querySelectorAll('.mic-btn').forEach(button => {
-      button.classList.remove('listening');
-    });
-
     btn.classList.add('listening');
-    showNotification('Listening...', 'info');
+    showNotification('Listening (Speak Name/PNO/Mobile)...', 'info', 2000);
     
     try {
       recognition.start();
     } catch (err) {
-      console.error('Speech Start Error:', err);
+      console.error('Speech API Start Error:', err);
       btn.classList.remove('listening');
     }
   });
 
   recognition.onresult = (event) => {
     let transcript = event.results[0][0].transcript;
-    console.log(`[Speech API] Results received for #${inputId}:`, transcript);
+    console.log(`[Speech API] Recorded: ${transcript}`);
     
-    // Clean trailing punctuation
     if (transcript.endsWith('.')) {
       transcript = transcript.slice(0, -1);
     }
     
-    input.value = transcript;
+    // Clean spaces for PNO and mobile numbers
+    if (inputId === 'inputPNO' || inputId === 'inputMobile') {
+      transcript = transcript.replace(/\s+/g, '');
+    }
     
-    // Dispatch input event to notify search queries / filters
-    input.dispatchEvent(new Event('input'));
+    input.value = transcript.toUpperCase();
     showNotification(`Recorded: "${transcript}"`, 'success', 2000);
   };
 
   recognition.onerror = (event) => {
-    console.error(`[Speech API] Error on #${inputId}:`, event.error);
-    if (event.error !== 'no-speech') {
-      showNotification(`Voice error: ${event.error}`, 'error');
-    }
+    console.error(`[Speech API] Error:`, event.error);
     btn.classList.remove('listening');
   };
 
@@ -104,26 +132,72 @@ function setupVoiceField(buttonId, inputId) {
 }
 
 /* ==========================================================================
-   Page 1: Registration Form Logic (index.html)
+   1. Secure Login Page (login.html)
    ========================================================================== */
 
-function initRegistrationPage() {
-  console.log('>>> [INIT] Setting up Registration page controllers...');
+function initLoginPage() {
+  const form = document.getElementById('loginForm');
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const loginId = document.getElementById('inputLoginId').value.trim();
+    const password = document.getElementById('inputPassword').value.trim();
+    
+    const btn = document.getElementById('btnLogin');
+    btn.disabled = true;
+    btn.innerText = 'Verifying Credentials...';
 
-  // Setup voice fields
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Login verification failed.');
+      }
+
+      // Save token and user info
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      showNotification('Success! Opening dashboard...', 'success');
+      
+      setTimeout(() => {
+        if (data.user.roleName === 'Admin') {
+          window.location.href = 'admin-dashboard.html';
+        } else {
+          window.location.href = 'personnel-dashboard.html';
+        }
+      }, 1000);
+
+    } catch (err) {
+      showNotification(err.message, 'error');
+      btn.disabled = false;
+      btn.innerText = 'Log In securely';
+    }
+  });
+}
+
+/* ==========================================================================
+   2. Personnel Registration Page (register.html)
+   ========================================================================== */
+
+function initRegisterPage() {
   setupVoiceField('btnMicName', 'inputName');
   setupVoiceField('btnMicPNO', 'inputPNO');
   setupVoiceField('btnMicMobile', 'inputMobile');
 
   const btnSendOtp = document.getElementById('btnSendOtp');
   const otpSection = document.getElementById('otpSection');
-  const registrationForm = document.getElementById('registrationForm');
+  const form = document.getElementById('registrationForm');
 
-  // Trigger Send OTP code to email
   btnSendOtp.addEventListener('click', async (e) => {
     e.preventDefault();
-    const emailInput = document.getElementById('inputEmail');
-    const email = emailInput.value.trim();
+    const email = document.getElementById('inputEmail').value.trim();
 
     if (!email) {
       showNotification('Please enter a valid email address first.', 'error');
@@ -141,16 +215,14 @@ function initRegistrationPage() {
       });
 
       const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send OTP.');
+        throw new Error(data.error || 'Failed to dispatch OTP.');
       }
 
-      showNotification(data.message || 'OTP successfully sent! Please check your inbox.', 'success');
-      
-      // Open OTP field section
+      showNotification(data.message, 'success', 0);
       otpSection.style.display = 'block';
       document.getElementById('inputOtp').focus();
+
     } catch (err) {
       showNotification(err.message, 'error');
     } finally {
@@ -159,43 +231,43 @@ function initRegistrationPage() {
     }
   });
 
-  // Submit entire registration details + OTP validation
-  registrationForm.addEventListener('submit', async (e) => {
-    e.preventDefault(); // CRUCIAL: Prevent default page refresh on submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
     const name = document.getElementById('inputName').value.trim();
     const pno = document.getElementById('inputPNO').value.trim();
+    const rank = document.getElementById('selectRank').value;
+    const postingUnit = document.getElementById('inputPostingUnit').value.trim();
     const mobile = document.getElementById('inputMobile').value.trim();
     const email = document.getElementById('inputEmail').value.trim();
+    const password = document.getElementById('inputPassword').value.trim();
     const otp = document.getElementById('inputOtp').value.trim();
 
-    if (!name || !pno || !mobile || !email || !otp) {
-      showNotification('All fields, including the OTP, are required.', 'error');
+    if (!name || !pno || !rank || !postingUnit || !mobile || !email || !password || !otp) {
+      showNotification('All registration fields are required.', 'error');
       return;
     }
 
     const btnRegister = document.getElementById('btnRegister');
     btnRegister.disabled = true;
-    btnRegister.innerText = 'Registering User...';
+    btnRegister.innerText = 'Registering Officer...';
 
     try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/users`, {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, pno, mobile, email, otp })
+        body: JSON.stringify({ name, pno, rank, postingUnit, mobile, email, password, otp })
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || 'Registration failed.');
       }
 
-      // Display a persistent success message
-      showNotification('Registration successful! The record has been uploaded to database.', 'success', 0);
-      
-      // CRUCIAL: Do not clear, reset, or empty fields. Let them remain visible.
-      console.log('>>> [SUCCESS] Registration completed. Inputs preserved as per request.');
+      showNotification(data.message, 'success', 0);
+      form.reset();
+      otpSection.style.display = 'none';
+
     } catch (err) {
       showNotification(err.message, 'error');
       btnRegister.disabled = false;
@@ -205,227 +277,677 @@ function initRegistrationPage() {
 }
 
 /* ==========================================================================
-   Page 2: Data View & Exports Logic (view.html)
+   3. Police Personnel Dashboard (personnel-dashboard.html)
    ========================================================================== */
 
-let allUsers = [];
+async function initPersonnelDashboard() {
+  const token = localStorage.getItem('token');
+  const userJson = localStorage.getItem('user');
 
-function initDataViewPage() {
-  console.log('>>> [INIT] Setting up Data View page controllers...');
-
-  // Setup Voice search
-  setupVoiceField('btnMicSearch', 'inputSearch');
-
-  const searchInput = document.getElementById('inputSearch');
-  const btnExportExcel = document.getElementById('btnExportExcel');
-  const btnExportPdf = document.getElementById('btnExportPdf');
-
-  // Fetch initial list of records
-  fetchUsers();
-
-  // Search input filter listener
-  searchInput.addEventListener('input', () => {
-    filterTableData(searchInput.value);
-  });
-
-  // Export buttons triggers
-  btnExportExcel.addEventListener('click', () => exportToExcel());
-  btnExportPdf.addEventListener('click', () => exportToPdf());
-}
-
-/**
- * Fetch all users list from API
- */
-async function fetchUsers() {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/users`);
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch users database.');
-    }
-    
-    allUsers = await response.json();
-    renderTableData(allUsers);
-  } catch (err) {
-    showNotification(`Error: ${err.message}`, 'error');
-    const tableBody = document.getElementById('usersTableBody');
-    tableBody.innerHTML = `
-      <tr>
-        <td colspan="6" style="text-align: center; color: var(--error); padding: 3rem;">
-          ❌ Failed to load database: ${err.message}
-        </td>
-      </tr>
-    `;
+  if (!token || !userJson) {
+    window.location.href = 'login.html';
+    return;
   }
-}
 
-/**
- * Render user rows into table body
- */
-function renderTableData(users) {
-  const tableBody = document.getElementById('usersTableBody');
+  const user = JSON.parse(userJson);
   
-  if (users.length === 0) {
-    tableBody.innerHTML = `
-      <tr>
-        <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 3rem;">
-          No mess member records found.
-        </td>
-      </tr>
-    `;
-    return;
-  }
+  // Set headers
+  document.getElementById('userBrandHeader').innerText = `UP Police Mess | ${user.name}`;
+  document.getElementById('welcomeMessage').innerText = `Welcome, ${user.rank} ${user.name}`;
 
-  tableBody.innerHTML = users.map(user => {
-    const regDate = new Date(user.createdAt).toLocaleString();
-    return `
-      <tr>
-        <td data-label="ID">${user.id}</td>
-        <td data-label="Name">${escapeHtml(user.name)}</td>
-        <td data-label="PNO">${escapeHtml(user.pno)}</td>
-        <td data-label="Mobile">${escapeHtml(user.mobile)}</td>
-        <td data-label="Email">${escapeHtml(user.email)}</td>
-        <td data-label="Registration Date">${regDate}</td>
-      </tr>
-    `;
-  }).join('');
+  // 1. Fetch Profile Info & Fill Form
+  await loadUserProfile();
+
+  // 2. Fetch Weekly Menu
+  await loadWeeklyMenu();
+
+  // 3. Fetch Notices Board
+  await loadNoticesFeed('noticesFeed');
+
+  // 4. Fetch Personal Bills list
+  await loadPersonalBills();
+
+  // 5. Initialize Attendance form date
+  initAttendanceSection();
 }
 
-/**
- * Filter users based on query matching Name, PNO, Mobile or Email
- */
-function filterTableData(query) {
-  const cleanQuery = query.toLowerCase().trim();
-  if (!cleanQuery) {
-    renderTableData(allUsers);
-    return;
-  }
-
-  const filtered = allUsers.filter(user => {
-    return (
-      user.name.toLowerCase().includes(cleanQuery) ||
-      user.pno.toLowerCase().includes(cleanQuery) ||
-      user.mobile.toLowerCase().includes(cleanQuery) ||
-      user.email.toLowerCase().includes(cleanQuery)
-    );
-  });
-
-  renderTableData(filtered);
-}
-
-/* ==========================================================================
-   Exports Utilities
-   ========================================================================== */
-
-/**
- * Generates an Excel Sheet using SheetJS client-side
- */
-function exportToExcel() {
-  if (allUsers.length === 0) {
-    showNotification('No records available to export.', 'error');
-    return;
-  }
-
-  console.log('>>> [EXPORTS] Exporting to Excel...');
-  const table = document.getElementById('usersTable');
-  
+async function loadUserProfile() {
   try {
-    // Generate workbook directly from the rendered HTML table
-    const wb = XLSX.utils.table_to_book(table, { sheet: "Mess Members" });
-    XLSX.writeFile(wb, "Mess_Members_List.xlsx");
-    showNotification('Excel sheet downloaded successfully!', 'success');
-  } catch (err) {
-    console.error('Excel Export Error:', err);
-    showNotification('Failed to generate Excel export.', 'error');
-  }
-}
-
-/**
- * Generates a PDF Document using jsPDF and AutoTable plugin
- */
-function exportToPdf() {
-  if (allUsers.length === 0) {
-    showNotification('No records available to export.', 'error');
-    return;
-  }
-
-  console.log('>>> [EXPORTS] Exporting to PDF...');
-  
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    
-    // Add styling for document headers
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(30, 41, 59); // Charcoal Slate
-    doc.text("Mess Management System - Members Database", 14, 20);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // Muted Slate
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 27);
-    
-    // Render autotable structure
-    doc.autoTable({
-      html: '#usersTable',
-      startY: 32,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [79, 70, 229], // Indigo
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252] // light greyish slate alternate rows
-      },
-      margin: { top: 32, left: 14, right: 14 }
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users/profile`, {
+      headers: getAuthHeaders()
     });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    // Populate header details
+    document.getElementById('userRankPno').innerText = `Designation/Rank: ${data.rank} | Personal Number (PNO): ${data.pno} | Unit: ${data.postingUnit}`;
     
-    doc.save("Mess_Members_List.pdf");
-    showNotification('PDF document downloaded successfully!', 'success');
+    // Fill Profile update form
+    document.getElementById('profileName').value = data.name;
+    document.getElementById('profileRank').value = data.rank;
+    document.getElementById('profilePostingUnit').value = data.postingUnit;
+    document.getElementById('profileMobile').value = data.mobile;
+
+    // Attach profile update submit
+    const profileForm = document.getElementById('profileForm');
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('profileName').value.trim();
+      const rank = document.getElementById('profileRank').value;
+      const postingUnit = document.getElementById('profilePostingUnit').value.trim();
+      const mobile = document.getElementById('profileMobile').value.trim();
+
+      try {
+        const updateRes = await fetch(`${BACKEND_BASE_URL}/api/users/profile`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name, rank, postingUnit, mobile })
+        });
+        const updateData = await updateRes.json();
+        if (!updateRes.ok) throw new Error(updateData.error);
+
+        showNotification('Profile updated successfully!', 'success');
+        // Refresh local cache name
+        const cachedUser = JSON.parse(localStorage.getItem('user'));
+        cachedUser.name = name;
+        cachedUser.rank = rank;
+        localStorage.setItem('user', JSON.stringify(cachedUser));
+        document.getElementById('userBrandHeader').innerText = `UP Police Mess | ${name}`;
+        document.getElementById('welcomeMessage').innerText = `Welcome, ${rank} ${name}`;
+      } catch (err) {
+        showNotification(err.message, 'error');
+      }
+    });
+
   } catch (err) {
-    console.error('PDF Export Error:', err);
-    showNotification('Failed to generate PDF document.', 'error');
+    console.error('Failed to load profile:', err);
+  }
+}
+
+async function loadWeeklyMenu() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/menu`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const tbody = document.getElementById('menuTableBody');
+    if (!tbody) return;
+
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayIndex = new Date().getDay();
+    const todayName = daysOfWeek[todayIndex];
+
+    tbody.innerHTML = data.map(day => {
+      const isToday = day.dayOfWeek.toLowerCase() === todayName.toLowerCase();
+      const rowStyle = isToday ? 'style="background-color: rgba(207, 161, 64, 0.15); font-weight: 600;"' : '';
+      const todayIndicator = isToday ? ' <span class="badge badge-warning">Today</span>' : '';
+      
+      return `
+        <tr ${rowStyle}>
+          <td>${day.dayOfWeek}${todayIndicator}</td>
+          <td>${day.breakfast}</td>
+          <td>${day.lunch}</td>
+          <td>${day.dinner}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // If we're on the admin dashboard, also load selectMenuDay dropdown
+    const selectMenuDay = document.getElementById('selectMenuDay');
+    if (selectMenuDay) {
+      selectMenuDay.innerHTML = '<option value="" disabled selected>Choose Day</option>' + 
+        data.map(day => `<option value="${day.id}">${day.dayOfWeek}</option>`).join('');
+
+      // When day changes, pre-fill inputs
+      selectMenuDay.addEventListener('change', () => {
+        const selected = data.find(d => d.id == selectMenuDay.value);
+        if (selected) {
+          document.getElementById('inputMenuBreakfast').value = selected.breakfast;
+          document.getElementById('inputMenuLunch').value = selected.lunch;
+          document.getElementById('inputMenuDinner').value = selected.dinner;
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error('Failed to load weekly menu:', err);
+  }
+}
+
+async function loadNoticesFeed(feedElementId) {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/notices`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const feed = document.getElementById(feedElementId);
+    if (!feed) return;
+
+    if (data.length === 0) {
+      feed.innerHTML = '<p style="color: var(--text-secondary); text-align: center; font-size: 0.9rem;">No active notices on board.</p>';
+      return;
+    }
+
+    feed.innerHTML = data.map(notice => {
+      const dateStr = new Date(notice.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      return `
+        <div class="notice-item">
+          <div class="notice-title">${escapeHtml(notice.title)}</div>
+          <div class="notice-meta">Posted by: ${notice.postedByRank} ${notice.postedByName} on ${dateStr}</div>
+          <p class="notice-content">${escapeHtml(notice.content)}</p>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Failed to load notices feed:', err);
+  }
+}
+
+async function loadPersonalBills() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const tbody = document.getElementById('billsTableBody');
+    if (!tbody) return;
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No generated billing records found.</td></tr>`;
+      return;
+    }
+
+    const months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    tbody.innerHTML = data.map(bill => {
+      const statusBadge = bill.status === 'paid' 
+        ? '<span class="badge badge-success">Paid</span>' 
+        : '<span class="badge badge-danger">Unpaid</span>';
+      
+      return `
+        <tr>
+          <td>${months[bill.month]} ${bill.year}</td>
+          <td>${bill.totalMeals}</td>
+          <td>₹${bill.totalAmount}</td>
+          <td>${statusBadge}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Failed to load personal bills:', err);
+  }
+}
+
+function initAttendanceSection() {
+  const dateInput = document.getElementById('inputAttendanceDate');
+  if (!dateInput) return;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  dateInput.value = todayStr;
+
+  // Load attendance details for default date
+  fetchAndPopulateAttendance(todayStr);
+
+  dateInput.addEventListener('change', () => {
+    fetchAndPopulateAttendance(dateInput.value);
+  });
+
+  // Attach submit handler
+  const form = document.getElementById('attendanceForm');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const date = dateInput.value;
+    const breakfast = document.getElementById('checkBreakfast').checked;
+    const lunch = document.getElementById('checkLunch').checked;
+    const dinner = document.getElementById('checkDinner').checked;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/attendance`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ date, breakfast, lunch, dinner })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      showNotification('Meal choice updated successfully!', 'success');
+      loadAttendanceHistory(); // Refresh history log
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Load history log
+  loadAttendanceHistory();
+}
+
+async function fetchAndPopulateAttendance(date) {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/history`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const record = data.find(r => r.date === date);
+    
+    // Clear and set checkboxes
+    document.getElementById('checkBreakfast').checked = record ? !!record.breakfast : false;
+    document.getElementById('checkLunch').checked = record ? !!record.lunch : false;
+    document.getElementById('checkDinner').checked = record ? !!record.dinner : false;
+  } catch (err) {
+    console.error('Failed to fetch attendance choice:', err);
+  }
+}
+
+async function loadAttendanceHistory() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/history`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const tbody = document.getElementById('attendanceHistoryBody');
+    if (!tbody) return;
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No recent meal logs.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.slice(0, 10).map(r => {
+      const bIcon = r.breakfast ? '✅ Yes' : '❌ No';
+      const lIcon = r.lunch ? '✅ Yes' : '❌ No';
+      const dIcon = r.dinner ? '✅ Yes' : '❌ No';
+      return `
+        <tr>
+          <td>${r.date}</td>
+          <td>${bIcon}</td>
+          <td>${lIcon}</td>
+          <td>${dIcon}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load attendance history log:', err);
   }
 }
 
 /* ==========================================================================
-   Helper UI Utilities
+   4. Mess Admin Dashboard (admin-dashboard.html)
    ========================================================================== */
 
-/**
- * Display toast status messages
- */
-function showNotification(text, type = 'info', duration = 5000) {
-  const container = document.getElementById('statusMessage');
-  if (!container) return;
+async function initAdminDashboard() {
+  const token = localStorage.getItem('token');
+  const userJson = localStorage.getItem('user');
 
-  container.className = `message message-${type}`;
-  container.innerHTML = `
-    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
-    <div>${text}</div>
-  `;
-  container.style.display = 'flex';
+  if (!token || !userJson) {
+    window.location.href = 'login.html';
+    return;
+  }
 
-  // Automatically fade out only if duration > 0 (for persistent success)
-  if (duration > 0) {
-    if (window.toastTimeout) clearTimeout(window.toastTimeout);
-    window.toastTimeout = setTimeout(() => {
-      container.style.display = 'none';
-    }, duration);
+  const user = JSON.parse(userJson);
+  if (user.roleName !== 'Admin') {
+    window.location.href = 'personnel-dashboard.html';
+    return;
+  }
+
+  // Load stats counters
+  await loadAdminStats();
+
+  // Load personnel lists
+  await loadPersonnelLists();
+
+  // Load weekly menu details (updates menu dropdown and edit inputs)
+  await loadWeeklyMenu();
+
+  // Attach Menu submit form
+  const updateMenuForm = document.getElementById('updateMenuForm');
+  updateMenuForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('selectMenuDay').value;
+    const breakfast = document.getElementById('inputMenuBreakfast').value.trim();
+    const lunch = document.getElementById('inputMenuLunch').value.trim();
+    const dinner = document.getElementById('inputMenuDinner').value.trim();
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/menu/update`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id, breakfast, lunch, dinner })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      showNotification('Mess Menu updated successfully!', 'success');
+      loadWeeklyMenu(); // refresh cache menu
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Load Per-Meal Rates & Attach Rates edit form
+  await loadMealRates();
+
+  // Load Ledger list & generate billing defaults
+  initBillingManagementSection();
+
+  // Load announcements notice list & attach create form
+  await loadNoticesFeed('adminNoticesFeed');
+  initAnnouncementsForm();
+
+  // Export report attach submit
+  initExportsSection();
+}
+
+async function loadAdminStats() {
+  try {
+    // 1. Fetch aggregate users list
+    const activeRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=active`, { headers: getAuthHeaders() });
+    const activeData = await activeRes.json();
+    
+    const pendingRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=pending`, { headers: getAuthHeaders() });
+    const pendingData = await pendingRes.json();
+
+    document.getElementById('statTotalUsers').innerText = activeData.length;
+    document.getElementById('statPendingApprovals').innerText = pendingData.length;
+
+    // 2. Fetch daily aggregate meals served summary
+    const summaryRes = await fetch(`${BACKEND_BASE_URL}/api/attendance/summary`, { headers: getAuthHeaders() });
+    const summaryData = await summaryRes.json();
+    document.getElementById('statDailyMeals').innerText = summaryData.grandTotal || 0;
+
+  } catch (err) {
+    console.error('Failed to load dashboard statistics:', err);
   }
 }
 
-/**
- * Simple HTML sanitizer
- */
+async function loadPersonnelLists() {
+  try {
+    // 1. Load pending users
+    const pendingRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=pending`, { headers: getAuthHeaders() });
+    const pendingData = await pendingRes.json();
+
+    const pendingTbody = document.getElementById('pendingUsersTableBody');
+    if (pendingData.length === 0) {
+      pendingTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No pending user approvals.</td></tr>`;
+    } else {
+      pendingTbody.innerHTML = pendingData.map(u => `
+        <tr>
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.pno)}</td>
+          <td>${escapeHtml(u.rank)}</td>
+          <td>${escapeHtml(u.postingUnit)}</td>
+          <td>
+            <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="modifyStatus(${u.id}, 'active')">Approve</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // 2. Load active users
+    const activeRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=active`, { headers: getAuthHeaders() });
+    const activeData = await activeRes.json();
+
+    const activeTbody = document.getElementById('activeUsersTableBody');
+    if (activeData.length === 0) {
+      activeTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No active mess members.</td></tr>`;
+    } else {
+      activeTbody.innerHTML = activeData.map(u => `
+        <tr>
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.pno)}</td>
+          <td>${escapeHtml(u.rank)}</td>
+          <td>${escapeHtml(u.postingUnit)}</td>
+          <td><span class="badge badge-success">${u.status}</span></td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="modifyStatus(${u.id}, 'deactivated')">Deactivate</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+  } catch (err) {
+    console.error('Failed to load personnel tables:', err);
+  }
+}
+
+async function modifyStatus(userId, status) {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users/status`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ userId, status })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    showNotification(`Status updated successfully!`, 'success');
+    await loadAdminStats();
+    await loadPersonnelLists();
+  } catch (err) {
+    showNotification(err.message, 'error');
+  }
+}
+
+async function loadMealRates() {
+  const form = document.getElementById('updateRatesForm');
+  if (!form) return;
+
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    document.getElementById('rateBreakfast').value = data.breakfast;
+    document.getElementById('rateLunch').value = data.lunch;
+    document.getElementById('rateDinner').value = data.dinner;
+
+    // Attach edit rates submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const breakfast = document.getElementById('rateBreakfast').value;
+      const lunch = document.getElementById('rateLunch').value;
+      const dinner = document.getElementById('rateDinner').value;
+
+      try {
+        const updateRes = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ breakfast, lunch, dinner })
+        });
+        const updateData = await updateRes.json();
+        if (!updateRes.ok) throw new Error(updateData.error);
+
+        showNotification('Meal pricing updated successfully!', 'success');
+      } catch (err) {
+        showNotification(err.message, 'error');
+      }
+    });
+
+  } catch (err) {
+    console.error('Failed to load meal rates:', err);
+  }
+}
+
+function initBillingManagementSection() {
+  const form = document.getElementById('generateBillsForm');
+  if (!form) return;
+
+  // Set default values for billing generator
+  const today = new Date();
+  document.getElementById('selectBillMonth').value = today.getMonth() + 1;
+  document.getElementById('inputBillYear').value = today.getFullYear();
+
+  // Attach calculate submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const month = document.getElementById('selectBillMonth').value;
+    const year = document.getElementById('inputBillYear').value;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/bills/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ month, year })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      showNotification(data.message, 'success');
+      loadAdminBillsLedger(); // Refresh list
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Load bills list
+  loadAdminBillsLedger();
+
+  // Attach Payment modal confirmation handler
+  const payForm = document.getElementById('paymentForm');
+  payForm.addEventListener('submit', async (e) => {
+    const billId = document.getElementById('modalBillId').value;
+    const paymentMode = document.getElementById('selectPayMode').value;
+    const transactionId = document.getElementById('inputTxnId').value.trim();
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/bills/pay`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ billId, paymentMode, transactionId })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      showNotification('Bill payment registered successfully!', 'success');
+      loadAdminBillsLedger(); // reload list
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+}
+
+async function loadAdminBillsLedger() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, {
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const tbody = document.getElementById('adminBillsTableBody');
+    if (!tbody) return;
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No bills generated.</td></tr>`;
+      return;
+    }
+
+    const months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    tbody.innerHTML = data.map(bill => {
+      const statusBadge = bill.status === 'paid' 
+        ? '<span class="badge badge-success">Paid</span>' 
+        : '<span class="badge badge-warning">Unpaid</span>';
+
+      const actionButton = bill.status === 'unpaid'
+        ? `<button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="openPaymentModal(${bill.id})">Mark Paid</button>`
+        : `<span style="color: var(--text-secondary); font-size: 0.75rem;">N/A</span>`;
+      
+      return `
+        <tr>
+          <td>${escapeHtml(bill.userName)}</td>
+          <td>${escapeHtml(bill.pno)}</td>
+          <td>${months[bill.month]} ${bill.year}</td>
+          <td>${bill.totalMeals}</td>
+          <td>₹${bill.totalAmount}</td>
+          <td>${statusBadge}</td>
+          <td>${actionButton}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Failed to load bills ledger:', err);
+  }
+}
+
+function openPaymentModal(billId) {
+  document.getElementById('modalBillId').value = billId;
+  document.getElementById('inputTxnId').value = '';
+  document.getElementById('paymentDialog').showModal();
+}
+
+function initAnnouncementsForm() {
+  const form = document.getElementById('createNoticeForm');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('inputNoticeTitle').value.trim();
+    const content = document.getElementById('inputNoticeContent').value.trim();
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/notices`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ title, content })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      showNotification('Notice announcement published successfully!', 'success');
+      form.reset();
+      loadNoticesFeed('adminNoticesFeed'); // Refresh feed list
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+}
+
+function initExportsSection() {
+  const form = document.getElementById('exportReportForm');
+  if (!form) return;
+
+  // Defaults
+  const today = new Date();
+  document.getElementById('selectExportMonth').value = today.getMonth() + 1;
+  document.getElementById('inputExportYear').value = today.getFullYear();
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const month = document.getElementById('selectExportMonth').value;
+    const year = document.getElementById('inputExportYear').value;
+    const token = localStorage.getItem('token');
+
+    // Trigger standard browser download by navigating to custom CSV endpoint containing query auth token
+    const exportUrl = `${BACKEND_BASE_URL}/api/users/export-attendance?month=${month}&year=${year}&token=${token}`;
+    window.location.href = exportUrl;
+  });
+}
+
+/* ==========================================================================
+   Utilities helpers
+   ========================================================================== */
+
 function escapeHtml(str) {
-  if (typeof str !== 'string') return str;
+  if (!str) return '';
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
