@@ -33,8 +33,7 @@
 
         <!-- Role Selection Field -->
         <div class="form-group">
-          <label for="selectRole" class="form-label">Select Portal Access Role</label>
-          <select id="selectRole" required>
+          <select id="selectRole" aria-label="Select Portal Access Role" style="text-align: center; text-align-last: center;" required>
             <option value="Personnel" selected>Police Personnel / Other Users</option>
             <option value="Admin">Mess Manager (Admin)</option>
           </select>
@@ -50,7 +49,8 @@
         <!-- Password Field -->
         <div class="form-group">
           <label for="inputPassword" class="form-label" style="text-align: center;">Password</label>
-          <input type="password" id="inputPassword" class="form-input" placeholder="Enter secure password" required>
+          <input type="password" id="inputPassword" class="form-input" placeholder="Enter secure password"
+            style="text-align: center;" required>
         </div>
 
         <button type="submit" id="btnLogin" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
