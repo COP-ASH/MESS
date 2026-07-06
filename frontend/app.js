@@ -162,15 +162,6 @@ function initLoginPage() {
         throw new Error(data.error || 'Login verification failed.');
       }
 
-      // Validate selected role against the user's actual database role
-      const selectRole = document.getElementById('selectRole').value;
-      if (selectRole === 'Admin' && data.user.roleName !== 'Admin') {
-        throw new Error('Access Denied: You do not have administrator (Mess Manager) privileges.');
-      }
-      if (selectRole === 'Personnel' && data.user.roleName === 'Admin') {
-        throw new Error('Access Denied: Admin accounts must log in using the Mess Manager (Admin) option.');
-      }
-
       // Save token and user info
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));

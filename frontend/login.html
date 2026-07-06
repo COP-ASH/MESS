@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
   <meta name="description" content="Secure portal login for Uttar Pradesh Police Mess Management.">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <!-- Navigation Header -->
@@ -28,7 +30,7 @@
       <div id="statusMessage" class="message" style="display: none;" role="alert"></div>
 
       <form id="loginForm">
-        
+
         <!-- Role Selection Field -->
         <div class="form-group">
           <label for="selectRole" class="form-label">Select Portal Access Role</label>
@@ -37,16 +39,17 @@
             <option value="Admin">Mess Manager (Admin)</option>
           </select>
         </div>
-        
+
         <!-- Login ID Field -->
         <div class="form-group">
-          <label for="inputLoginId" class="form-label" style="text-align: center;">PNO OR Email</label>
-          <input type="text" id="inputLoginId" class="form-input" placeholder="e.g. 1859666 or vicky@copash.shop" style="text-align: center;" required>
+          <label for="inputLoginId" class="form-label" style="text-align: center;">Enter Your PNO OR Email</label>
+          <input type="text" id="inputLoginId" class="form-input" placeholder="e.g. 1859666 or vicky@copash.shop"
+            style="text-align: center;" required>
         </div>
 
         <!-- Password Field -->
         <div class="form-group">
-          <label for="inputPassword" class="form-label">Password</label>
+          <label for="inputPassword" class="form-label" style="text-align: center;">Password</label>
           <input type="password" id="inputPassword" class="form-input" placeholder="Enter secure password" required>
         </div>
 
@@ -55,8 +58,9 @@
         </button>
 
         <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
-          <span style="color: var(--text-secondary);">New Mess Registration?</span> 
-          <a href="register.html" style="color: var(--secondary-color); font-weight: 600; text-decoration: none;">Sign Up Here</a>
+          <span style="color: var(--text-secondary);">New Mess Registration?</span>
+          <a href="register.html" style="color: var(--secondary-color); font-weight: 600; text-decoration: none;">Sign
+            Up Here</a>
         </div>
       </form>
     </section>
@@ -76,4 +80,5 @@
     });
   </script>
 </body>
+
 </html>
