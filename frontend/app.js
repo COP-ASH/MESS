@@ -126,6 +126,20 @@ function setupVoiceField(buttonId, inputId) {
   recognition.onerror = (event) => {
     console.error(`[Speech API] Error:`, event.error);
     btn.classList.remove('listening');
+    
+    let errMsg = `Voice input error: ${event.error}`;
+    if (event.error === 'not-allowed') {
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        errMsg = 'Voice recognition requires a secure connection (HTTPS). Please access the site via HTTPS.';
+      } else {
+        errMsg = 'Microphone access denied. Please allow microphone permissions in your browser.';
+      }
+    } else if (event.error === 'no-speech') {
+      errMsg = 'No speech detected. Please speak clearly into the microphone.';
+    } else if (event.error === 'audio-capture') {
+      errMsg = 'No microphone detected. Please connect a microphone and try again.';
+    }
+    showNotification(errMsg, 'error');
   };
 
   recognition.onend = () => {
