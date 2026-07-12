@@ -10,6 +10,8 @@ const BACKEND_BASE_URL = window.location.hostname === "localhost" || window.loca
 
 // Global cache
 let activeDistrictsList = [];
+let currentBillsList = [];
+let memberBillsList = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('>>> [INIT] Application initialized. Base URL:', BACKEND_BASE_URL);
@@ -2149,27 +2151,27 @@ async function loadBillsTable() {
     const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, { headers: getAuthHeaders() });
     const data = await response.json();
     if (response.ok) {
-      tbody.innerHTML = '';
-      if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No monthly bills found.</td></tr>';
-        return;
+      currentBillsList = data; // Store globally for filtering and exporting
+      
+      // Initialize filters only once
+      if (!loadBillsTable.listenersInitialized) {
+        const filterMonth = document.getElementById('filterBillMonth');
+        const filterYear = document.getElementById('filterBillYear');
+        const btnDownloadPdf = document.getElementById('btnDownloadMonthlyPdf');
+
+        if (filterMonth) {
+          filterMonth.addEventListener('change', filterAndRenderBillsTable);
+        }
+        if (filterYear) {
+          filterYear.addEventListener('input', filterAndRenderBillsTable);
+        }
+        if (btnDownloadPdf) {
+          btnDownloadPdf.addEventListener('click', downloadMonthlyPdf);
+        }
+        loadBillsTable.listenersInitialized = true;
       }
-      data.forEach(b => {
-        const badgeClass = b.status === 'paid' ? 'success' : 'warning';
-        const actionBtn = b.status === 'unpaid'
-          ? `<button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="recordPayment(${b.id})">Mark Paid</button>`
-          : `<span style="font-size: 0.85rem; color: var(--success); font-weight: 600;">Paid</span>`;
-        tbody.innerHTML += `
-          <tr>
-            <td><strong>${b.userName || 'Member'}</strong></td>
-            <td>${b.month}/${b.year}</td>
-            <td>${b.totalMeals}</td>
-            <td>Rs. ${b.totalAmount}</td>
-            <td><span class="badge badge-${badgeClass}">${b.status.toUpperCase()}</span></td>
-            <td>${actionBtn}</td>
-          </tr>
-        `;
-      });
+
+      filterAndRenderBillsTable();
     }
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading bills.</td></tr>';
@@ -2321,9 +2323,10 @@ async function loadMemberBillsTable() {
     const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, { headers: getAuthHeaders() });
     const data = await response.json();
     if (response.ok) {
+      memberBillsList = data; // Store globally for printing individual slips
       tbody.innerHTML = '';
       if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No monthly bills generated.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No monthly bills generated.</td></tr>';
         return;
       }
       data.forEach(b => {
@@ -2335,12 +2338,17 @@ async function loadMemberBillsTable() {
             <td>Rs. ${b.totalAmount}</td>
             <td><span class="badge badge-${badgeClass}">${b.status.toUpperCase()}</span></td>
             <td>${new Date(b.createdAt).toLocaleDateString()}</td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;" onclick="downloadMemberSlip(${b.id})">
+                <span>📄</span> Slip
+              </button>
+            </td>
           </tr>
         `;
       });
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Error loading bills.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading bills.</td></tr>';
   }
 }
 
@@ -2523,5 +2531,435 @@ async function deleteNilDietRequest(id) {
     }
   } catch (err) {
     showNotification(err.message, 'error');
+  }
+}
+
+/* ==========================================================================
+   Diet Bills PDF slips and Monthly Reports generators
+   ========================================================================== */
+
+function filterAndRenderBillsTable() {
+  const tbody = document.getElementById('billsTableBody');
+  if (!tbody) return;
+
+  const filterMonthVal = document.getElementById('filterBillMonth').value;
+  const filterYearEl = document.getElementById('filterBillYear');
+  const filterYearVal = filterYearEl ? filterYearEl.value.trim() : '';
+
+  let filtered = currentBillsList;
+
+  if (filterMonthVal !== 'all') {
+    const m = parseInt(filterMonthVal);
+    filtered = filtered.filter(b => b.month === m);
+  }
+
+  if (filterYearVal !== '') {
+    const y = parseInt(filterYearVal);
+    if (!isNaN(y)) {
+      filtered = filtered.filter(b => b.year === y);
+    }
+  }
+
+  tbody.innerHTML = '';
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No monthly bills found matching the filters.</td></tr>';
+    return;
+  }
+
+  filtered.forEach(b => {
+    const badgeClass = b.status === 'paid' ? 'success' : 'warning';
+    const actionBtn = b.status === 'unpaid'
+      ? `<button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="recordPayment(${b.id})">Mark Paid</button>`
+      : `<span style="font-size: 0.85rem; color: var(--success); font-weight: 600;">Paid</span>`;
+    tbody.innerHTML += `
+      <tr>
+        <td><strong>${b.userName || 'Member'}</strong></td>
+        <td>${b.month}/${b.year}</td>
+        <td>${b.totalMeals}</td>
+        <td>Rs. ${b.totalAmount}</td>
+        <td><span class="badge badge-${badgeClass}">${b.status.toUpperCase()}</span></td>
+        <td>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            ${actionBtn}
+            <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;" onclick="downloadIndividualSlip(${b.id})">
+              <span>📄</span> Slip
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function getLogoBase64() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = 'up-police-logo.png';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        console.error('Failed to convert logo to base64:', err);
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      resolve(null);
+    };
+  });
+}
+
+async function downloadIndividualSlip(billId) {
+  const bill = currentBillsList.find(b => b.id === billId);
+  if (!bill) {
+    showNotification('Bill not found.', 'error');
+    return;
+  }
+  const logoBase64 = await getLogoBase64();
+  generateIndividualPdfSlip(bill, bill.userName || 'Member', bill.email || '', logoBase64);
+}
+
+async function downloadMemberSlip(billId) {
+  const bill = memberBillsList.find(b => b.id === billId);
+  if (!bill) {
+    showNotification('Bill not found.', 'error');
+    return;
+  }
+  const user = JSON.parse(localStorage.getItem('user')) || {};
+  const memberName = user.fullName || 'Member';
+  const memberEmail = user.email || '';
+  const logoBase64 = await getLogoBase64();
+  generateIndividualPdfSlip(bill, memberName, memberEmail, logoBase64);
+}
+
+function generateIndividualPdfSlip(bill, memberName, memberEmail, logoBase64) {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a5'
+    });
+
+    const districtName = (document.getElementById('statDistrictName') ? document.getElementById('statDistrictName').innerText.trim() : null) || 
+                         (document.getElementById('distNameText') ? document.getElementById('distNameText').innerText.trim() : null) || 
+                         'Uttar Pradesh Police';
+
+    const getMonthName = (monthNum) => {
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      return months[monthNum - 1] || "";
+    };
+
+    // Card/Receipt border
+    doc.setDrawColor(226, 232, 240); // light gray border
+    doc.rect(5, 5, 138, 200);
+
+    // Decorative top header bar
+    doc.setFillColor(30, 41, 59); // dark slate blue
+    doc.rect(5, 5, 138, 4, 'F');
+
+    let titleStartY = 20;
+
+    // Draw logo if available
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'PNG', 64, 13, 20, 20);
+      titleStartY = 39;
+    }
+
+    // Header Text
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(30, 41, 59);
+    doc.text("UTTAR PRADESH POLICE MESS", 74, titleStartY, { align: 'center' });
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`${districtName.toUpperCase()} DISTRICT`, 74, titleStartY + 6, { align: 'center' });
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("MONTHLY DIET BILL RECEIPT / SLIP", 74, titleStartY + 11, { align: 'center' });
+
+    // Separator line
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    const lineY = titleStartY + 16;
+    doc.line(10, lineY, 138, lineY);
+
+    // Metadata Details
+    doc.setFontSize(9);
+    
+    // Row 1
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Bill Invoice No:", 12, lineY + 8);
+    doc.setFont("Helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`MMS-${bill.year}${String(bill.month).padStart(2, '0')}-${String(bill.id).padStart(4, '0')}`, 40, lineY + 8);
+
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Bill Date:", 85, lineY + 8);
+    doc.setFont("Helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(new Date(bill.createdAt).toLocaleDateString('en-IN'), 105, lineY + 8);
+
+    // Row 2
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Member Name:", 12, lineY + 15);
+    doc.setFont("Helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(memberName, 40, lineY + 15);
+
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Period:", 85, lineY + 15);
+    doc.setFont("Helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${getMonthName(bill.month)} ${bill.year}`, 105, lineY + 15);
+
+    // Row 3
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Member Email:", 12, lineY + 22);
+    doc.setFont("Helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(memberEmail, 40, lineY + 22);
+
+    // Charges Table
+    doc.autoTable({
+      startY: lineY + 30,
+      margin: { left: 10, right: 10 },
+      head: [['Description', 'Meals Count', 'Total Amount']],
+      body: [
+        ['Diet Mess Consumption Charges', `${bill.totalMeals}`, `Rs. ${bill.totalAmount}`]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { textColor: [15, 23, 42], fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 60, halign: 'left' },
+        1: { cellWidth: 30, halign: 'center' },
+        2: { cellWidth: 38, halign: 'right' }
+      }
+    });
+
+    const finalY = doc.lastAutoTable.finalY;
+
+    // Payment Status badge/block
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Payment Status:", 12, finalY + 12);
+
+    const isPaid = bill.status.toLowerCase() === 'paid';
+    if (isPaid) {
+      doc.setFillColor(220, 252, 231); // light green background
+      doc.rect(42, finalY + 8, 20, 6, 'F');
+      doc.setTextColor(21, 128, 61); // dark green text
+      doc.setFontSize(9);
+      doc.setFont("Helvetica", "bold");
+      doc.text("PAID", 52, finalY + 12.5, { align: 'center' });
+    } else {
+      doc.setFillColor(254, 226, 226); // light red background
+      doc.rect(42, finalY + 8, 20, 6, 'F');
+      doc.setTextColor(185, 28, 28); // dark red text
+      doc.setFontSize(9);
+      doc.setFont("Helvetica", "bold");
+      doc.text("UNPAID", 52, finalY + 12.5, { align: 'center' });
+    }
+
+    // Disclaimer
+    doc.setFont("Helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("* Diet charges are compiled from daily digital roll attendance logs.", 12, finalY + 22);
+
+    // Signature Block
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("__________________________", 12, finalY + 44);
+    doc.text("Member's Signature", 12, finalY + 49);
+
+    doc.text("__________________________", 85, finalY + 44);
+    doc.text("Mess Commander / Admin", 85, finalY + 49);
+
+    // Footer copyright
+    doc.setFont("Helvetica", "italic");
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Computer Generated Diet Bill Slip. Validated digitally.", 74, 195, { align: 'center' });
+
+    doc.save(`Mess_Bill_Slip_${bill.year}_${String(bill.month).padStart(2, '0')}_${memberName.replace(/\s+/g, '_')}.pdf`);
+  } catch (err) {
+    console.error("PDF generation failed:", err);
+    showNotification("Failed to generate PDF slip.", "error");
+  }
+}
+
+async function downloadMonthlyPdf() {
+  try {
+    const filterMonthVal = document.getElementById('filterBillMonth').value;
+    const filterYearEl = document.getElementById('filterBillYear');
+    const filterYearVal = filterYearEl ? filterYearEl.value.trim() : '';
+
+    let filtered = currentBillsList;
+    let selectedMonthName = "ALL PERIODS";
+    let selectedYear = "";
+
+    const getMonthName = (monthNum) => {
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      return months[monthNum - 1] || "";
+    };
+
+    if (filterMonthVal !== 'all') {
+      const m = parseInt(filterMonthVal);
+      filtered = filtered.filter(b => b.month === m);
+      selectedMonthName = getMonthName(m).toUpperCase();
+    }
+
+    if (filterYearVal !== '') {
+      const y = parseInt(filterYearVal);
+      if (!isNaN(y)) {
+        filtered = filtered.filter(b => b.year === y);
+        selectedYear = y;
+      }
+    }
+
+    if (filtered.length === 0) {
+      showNotification('No bill records found for the selected filters.', 'error');
+      return;
+    }
+
+    const logoBase64 = await getLogoBase64();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const districtName = (document.getElementById('statDistrictName') ? document.getElementById('statDistrictName').innerText.trim() : null) || 'Uttar Pradesh Police';
+
+    let titleStartY = 26;
+    let tableStartY = 74;
+    let summaryBoxY = 48;
+
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'PNG', 93, 10, 24, 24);
+      titleStartY = 41;
+      summaryBoxY = 63;
+      tableStartY = 89;
+    }
+
+    // Header Text
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(30, 41, 59);
+    doc.text("UTTAR PRADESH POLICE MESS", 105, titleStartY, { align: 'center' });
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`${districtName.toUpperCase()} DISTRICT MESS REPORT`, 105, titleStartY + 7, { align: 'center' });
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    const subTitleStr = selectedYear ? `MONTHLY BILLS STATEMENT - ${selectedMonthName} ${selectedYear}` : `BILLS STATEMENT - ${selectedMonthName}`;
+    doc.text(subTitleStr, 105, titleStartY + 13, { align: 'center' });
+
+    // Separator line
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.line(10, titleStartY + 18, 200, titleStartY + 18);
+
+    // Calculate Summary Stats
+    const totalMealsSum = filtered.reduce((acc, curr) => acc + curr.totalMeals, 0);
+    const totalAmountSum = filtered.reduce((acc, curr) => acc + parseFloat(curr.totalAmount), 0);
+    const totalPaidSum = filtered.filter(b => b.status.toLowerCase() === 'paid').reduce((acc, curr) => acc + parseFloat(curr.totalAmount), 0);
+    const totalUnpaidSum = totalAmountSum - totalPaidSum;
+
+    // Summary Box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(10, summaryBoxY, 190, 20, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(10, summaryBoxY, 190, 20);
+
+    doc.setFontSize(9);
+    doc.setFont("Helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Summary Statistics:", 14, summaryBoxY + 5);
+
+    doc.setFont("Helvetica", "normal");
+    doc.text(`Total Records: ${filtered.length}`, 14, summaryBoxY + 12);
+    doc.text(`Total Meals Eaten: ${totalMealsSum}`, 64, summaryBoxY + 12);
+    doc.text(`Total Amount: Rs. ${totalAmountSum.toFixed(2)}`, 124, summaryBoxY + 5);
+    doc.text(`Total Paid: Rs. ${totalPaidSum.toFixed(2)}`, 124, summaryBoxY + 12);
+    doc.text(`Total Unpaid: Rs. ${totalUnpaidSum.toFixed(2)}`, 124, summaryBoxY + 17);
+
+    // Table of Bills
+    doc.autoTable({
+      startY: tableStartY,
+      margin: { left: 10, right: 10 },
+      head: [['S.No.', 'Member Name', 'Period', 'Meals Eaten', 'Total Amount', 'Status']],
+      body: filtered.map((b, idx) => [
+        idx + 1,
+        b.userName || 'Member',
+        `${getMonthName(b.month)} / ${b.year}`,
+        b.totalMeals,
+        `Rs. ${b.totalAmount}`,
+        b.status.toUpperCase()
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
+      bodyStyles: { textColor: [51, 65, 85], fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 15, halign: 'center' },
+        1: { cellWidth: 55, halign: 'left' },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 35, halign: 'right' },
+        5: { cellWidth: 30, halign: 'center' }
+      }
+    });
+
+    const finalY = doc.lastAutoTable.finalY;
+
+    let sigY = finalY + 20;
+    if (sigY > 260) {
+      doc.addPage();
+      sigY = 30;
+    }
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text("__________________________", 15, sigY);
+    doc.text("Prepared By (Accountant)", 15, sigY + 5);
+
+    doc.text("__________________________", 135, sigY);
+    doc.text("Mess Commander / Admin Approval", 135, sigY + 5);
+
+    doc.setFont("Helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Report generated on ${new Date().toLocaleString('en-IN')}`, 105, 285, { align: 'center' });
+
+    const monthFileStr = filterMonthVal !== 'all' ? `_${getMonthName(parseInt(filterMonthVal))}` : '';
+    const yearFileStr = filterYearVal ? `_${filterYearVal}` : '';
+    doc.save(`Monthly_Mess_Bills${monthFileStr}${yearFileStr}.pdf`);
+  } catch (err) {
+    console.error("PDF generation failed:", err);
+    showNotification("Failed to generate Monthly PDF Report.", "error");
   }
 }
