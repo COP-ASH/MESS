@@ -1,349 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UP Police Mess Management - Admin Control Panel</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- jsPDF for PDF generation -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <!-- jsPDF-AutoTable plugin for tables in PDF -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
+  <title>Super Admin Dashboard - Mess Management</title>
+  <link rel="stylesheet" href="style.css?v=1.2">
+  <!-- Load Chart.js CDN for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
 
-  <!-- Navigation Header -->
+<body class="dashboard-page">
+
+  <!-- Header -->
   <header>
-    <nav class="navbar" aria-label="Main Navigation">
-      <div class="nav-brand">UP Police Mess Admin</div>
+    <nav class="navbar">
+      <div class="nav-brand">👑 SUPER ADMIN SYSTEM CONTROL</div>
       <ul class="nav-links">
-        <li><a href="#" class="active">Admin Panel</a></li>
-        <li><a href="personnel-dashboard.html">View User View</a></li>
-        <li><button id="btnLogout" class="btn btn-logout">Logout</button></li>
+        <li style="color: var(--text-secondary); font-size: 0.9rem;" id="userGreeting">Loading Admin Profile...</li>
+        <li style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.85; border-left: 1px solid var(--glass-border); padding-left: 1rem;" id="currentTimeDisplay">--:--</li>
+        <li><button class="btn btn-accent" id="btnLogout" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Logout</button></li>
       </ul>
     </nav>
   </header>
 
-  <!-- Main Body Content -->
+  <!-- Main container -->
   <main>
-    
-    <!-- Welcome Header banner -->
-    <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem; border-left: 5px solid var(--secondary-color);">
-      <h3 style="color: var(--primary-color);">Uttar Pradesh Police Mess Admin Console</h3>
-      <p style="color: var(--text-secondary); font-size: 0.9rem;">Officer In-Charge Portal - Security Auditing & Administrative Panel</p>
-    </div>
+    <!-- Navigation Tabs -->
+    <nav class="tab-container" aria-label="Dashboard Section Tabs">
+      <button class="tab-btn active" onclick="switchTab('tabAnalytics')">Analytics</button>
+      <button class="tab-btn" onclick="switchTab('tabDistricts')">Districts</button>
+      <button class="tab-btn" onclick="switchTab('tabAdmins')">District Admins</button>
+      <button class="tab-btn" onclick="switchTab('tabUsers')">Registered Users</button>
+      <button class="tab-btn" onclick="switchTab('tabSettings')">System Settings</button>
+      <button class="tab-btn" onclick="switchTab('tabLogs')">Security Audit Logs</button>
+    </nav>
 
-    <!-- Administrative Statistics Summary -->
-    <div class="stats-container">
-      <div class="stat-card">
-        <span class="stat-label">Total Officers</span>
-        <span class="stat-value" id="statTotalUsers">0</span>
-      </div>
-      <div class="stat-card accent">
-        <span class="stat-label">Daily Meals Served (Today)</span>
-        <span class="stat-value" id="statDailyMeals">0</span>
-      </div>
-      <div class="stat-card secondary">
-        <span class="stat-label">Pending Approvals</span>
-        <span class="stat-value" id="statPendingApprovals">0</span>
-      </div>
-    </div>
+    <!-- Global alert messages -->
+    <div id="statusMessage" class="message" role="alert" style="margin-bottom: 2rem;"></div>
 
-    <!-- Main Grid Layout -->
-    <div class="dashboard-grid">
-      
-      <!-- Administrative Menu tabs -->
-      <div class="col-3">
-        <div class="glass-panel" style="padding: 1rem; background: white; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;">
-          <h4 style="margin-bottom: 0.5rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px;">Controls</h4>
-          <button class="tab-btn active" style="text-align: left; width: 100%;" onclick="switchTab('tabApprovals')">Personnel Approvals</button>
-          <button class="tab-btn" style="text-align: left; width: 100%;" onclick="switchTab('tabMenuMgmt')">Edit Mess Menu</button>
-          <button class="tab-btn" style="text-align: left; width: 100%;" onclick="switchTab('tabRates')">Per-Meal Rates</button>
-          <button class="tab-btn" style="text-align: left; width: 100%;" onclick="switchTab('tabBillingMgmt')">Generate & Pay Bills</button>
-          <button class="tab-btn" style="text-align: left; width: 100%;" onclick="switchTab('tabAnnouncements')">Official Notices</button>
-          <button class="tab-btn" style="text-align: left; width: 100%;" onclick="switchTab('tabExports')">Export Reports</button>
+    <!-- 1. ANALYTICS TAB -->
+    <section id="tabAnalytics" class="tab-content active">
+      <div class="dashboard-grid">
+        <div class="stat-card" onclick="switchTab('tabDistricts')">
+          <h3>Total Districts</h3>
+          <div class="value" id="statTotalDistricts">0</div>
+          <div class="trend" style="color: var(--info);">Independent Messes</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabDistricts')">
+          <h3>Active Districts</h3>
+          <div class="value" id="statActiveDistricts" style="color: var(--success);">0</div>
+          <div class="trend" id="statActiveDistrictsSub">Operational</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabDistricts')">
+          <h3>Inactive Districts</h3>
+          <div class="value" id="statInactiveDistricts" style="color: var(--error);">0</div>
+          <div class="trend">Suspended Messes</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabUsers')">
+          <h3>Total Registered Users</h3>
+          <div class="value" id="statTotalUsers">0</div>
+          <div class="trend" style="color: var(--accent-light);">Across all regions</div>
         </div>
       </div>
 
-      <!-- Main Action Container -->
-      <div class="col-9">
-        <div id="statusMessage" class="message" style="display: none;" role="alert"></div>
-
-        <!-- Tab 1: Personnel Approvals -->
-        <div id="tabApprovals" class="tab-content active">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 0;">Pending Registrations</h3>
-            <button onclick="exportTableToPDF('pendingUsersTable', 'pending_registrations.pdf', 'UP Police Mess - Pending Registrations')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <div class="table-responsive" style="margin-bottom: 2rem;">
-            <table id="pendingUsersTable">
-              <thead>
-                <tr>
-                  <th>Officer Name</th>
-                  <th>PNO</th>
-                  <th>Rank</th>
-                  <th>Posting Unit</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="pendingUsersTableBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 0;">Active Police Members</h3>
-            <button onclick="exportTableToPDF('activeUsersTable', 'active_members.pdf', 'UP Police Mess - Active Police Members')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <div class="table-responsive">
-            <table id="activeUsersTable">
-              <thead>
-                <tr>
-                  <th>Officer Name</th>
-                  <th>PNO</th>
-                  <th>Rank</th>
-                  <th>Posting Unit</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="activeUsersTableBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
+      <!-- Charts Row -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="chart-card">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">User Distribution by District</h3>
+          <div style="position: relative; height: 260px; width: 100%;">
+            <canvas id="chartUserDistribution"></canvas>
           </div>
         </div>
-
-        <!-- Tab 2: Edit Mess Menu -->
-        <div id="tabMenuMgmt" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Update Mess Menu</h3>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
-            <form id="updateMenuForm">
-              <div style="display: flex; gap: 1.5rem; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 0;">
-                  <label for="selectMenuDay" class="form-label" style="font-weight: 700;">Select Day to Update</label>
-                  <select id="selectMenuDay" style="padding: 0.8rem; font-size: 1rem; border: 2px solid var(--accent-color); border-radius: var(--radius-sm);" required>
-                    <!-- Loaded dynamically -->
-                  </select>
-                </div>
-                <div style="flex: 2; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; min-width: 300px;">
-                  💡 Select a day from the dropdown to automatically load that day's breakfast, lunch, and dinner menus. Make any edits and click Save.
-                </div>
-              </div>
-              
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-                <div class="form-group">
-                  <label for="inputMenuBreakfast" class="form-label" style="font-weight: 600;">Breakfast Menu</label>
-                  <input type="text" id="inputMenuBreakfast" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Aloo Paratha, Curd" required>
-                </div>
-                <div class="form-group">
-                  <label for="inputMenuLunch" class="form-label" style="font-weight: 600;">Lunch Menu</label>
-                  <input type="text" id="inputMenuLunch" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Rajma, Rice, Roti, Salad" required>
-                </div>
-                <div class="form-group">
-                  <label for="inputMenuDinner" class="form-label" style="font-weight: 600;">Dinner Menu</label>
-                  <input type="text" id="inputMenuDinner" class="form-input" style="padding: 0.8rem;" placeholder="e.g. Paneer Masala, Roti, Dal, Sweets" required>
-                </div>
-              </div>
-              
-              <div style="display: flex; justify-content: flex-end;">
-                <button type="submit" class="btn btn-primary" style="padding: 0.8rem 2rem; font-size: 1rem; border-radius: var(--radius-sm); font-weight: 600;">
-                  💾 Save Menu Changes
-                </button>
-              </div>
-            </form>
+        <div class="chart-card">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">Daily Account Registrations</h3>
+          <div style="position: relative; height: 260px; width: 100%;">
+            <canvas id="chartDailyRegistrations"></canvas>
           </div>
         </div>
-
-        <!-- Tab 3: Per-Meal Rates -->
-        <div id="tabRates" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Per-Meal Pricing Configuration</h3>
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-            Configure individual pricing structures (in INR) for meals. These values dynamically calculate monthly bills.
-          </p>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color); max-width: 400px;">
-            <form id="updateRatesForm">
-              <div class="form-group">
-                <label for="rateBreakfast" class="form-label">Breakfast Rate (₹)</label>
-                <input type="number" id="rateBreakfast" class="form-input" step="0.5" required>
-              </div>
-              <div class="form-group">
-                <label for="rateLunch" class="form-label">Lunch Rate (₹)</label>
-                <input type="number" id="rateLunch" class="form-input" step="0.5" required>
-              </div>
-              <div class="form-group">
-                <label for="rateDinner" class="form-label">Dinner Rate (₹)</label>
-                <input type="number" id="rateDinner" class="form-input" step="0.5" required>
-              </div>
-              <button type="submit" class="btn btn-primary">Save Rates</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Tab 4: Generate & Pay Bills -->
-        <div id="tabBillingMgmt" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Generate Monthly Bills</h3>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color); margin-bottom: 2rem;">
-            <form id="generateBillsForm">
-              <div style="display: flex; gap: 1.5rem; align-items: flex-end;">
-                <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                  <label for="selectBillMonth" class="form-label">Billing Month</label>
-                  <select id="selectBillMonth" required>
-                    <option value="1">January</option>
-                    <option value="2">February</option>
-                    <option value="3">March</option>
-                    <option value="4">April</option>
-                    <option value="5">May</option>
-                    <option value="6">June</option>
-                    <option value="7">July</option>
-                    <option value="8">August</option>
-                    <option value="9">September</option>
-                    <option value="10">October</option>
-                    <option value="11">November</option>
-                    <option value="12">December</option>
-                  </select>
-                </div>
-                <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                  <label for="inputBillYear" class="form-label">Billing Year</label>
-                  <input type="number" id="inputBillYear" class="form-input" min="2020" max="2050" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Calculate & Generate Bills</button>
-              </div>
-            </form>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 0;">Billing & Transactions Ledger</h3>
-            <button onclick="exportTableToPDF('adminBillsTable', 'billing_ledger.pdf', 'UP Police Mess - Billing Ledger')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <div class="table-responsive">
-            <table id="adminBillsTable">
-              <thead>
-                <tr>
-                  <th>Officer Name</th>
-                  <th>PNO</th>
-                  <th>Month/Year</th>
-                  <th>Meals</th>
-                  <th>Balance (₹)</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="adminBillsTableBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Tab 5: Official Notices -->
-        <div id="tabAnnouncements" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Publish Official Notice</h3>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color); margin-bottom: 2rem;">
-            <form id="createNoticeForm">
-              <div class="form-group">
-                <label for="inputNoticeTitle" class="form-label">Notice Title</label>
-                <input type="text" id="inputNoticeTitle" class="form-input" placeholder="e.g. Mess Closed on Republic Day" required>
-              </div>
-              <div class="form-group">
-                <label for="inputNoticeContent" class="form-label">Content Description</label>
-                <textarea id="inputNoticeContent" class="form-input" style="height: 100px; resize: vertical;" placeholder="Enter notice details..." required></textarea>
-              </div>
-              <button type="submit" class="btn btn-primary">Post Announcement</button>
-            </form>
-          </div>
-
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Notice History</h3>
-          <div class="notice-board" id="adminNoticesFeed">
-            <!-- Loaded dynamically -->
-          </div>
-        </div>
-
-        <!-- Tab 6: Export Reports -->
-        <div id="tabExports" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Data & Audit Reports Exports</h3>
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-            Select a target month and year to download the complete meal attendance ledger of all whitelisted officers in standard CSV format.
-          </p>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color); max-width: 500px;">
-            <form id="exportReportForm">
-              <div class="form-group">
-                <label for="selectExportMonth" class="form-label">Target Month</label>
-                <select id="selectExportMonth" required>
-                  <option value="1">January</option>
-                  <option value="2">February</option>
-                  <option value="3">March</option>
-                  <option value="4">April</option>
-                  <option value="5">May</option>
-                  <option value="6">June</option>
-                  <option value="7">July</option>
-                  <option value="8">August</option>
-                  <option value="9">September</option>
-                  <option value="10">October</option>
-                  <option value="11">November</option>
-                  <option value="12">December</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="inputExportYear" class="form-label">Target Year</label>
-                <input type="number" id="inputExportYear" class="form-input" min="2020" max="2050" required>
-              </div>
-              <div style="display: flex; gap: 1rem;">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">📄 Download CSV</button>
-                <button type="button" id="btnExportAttendancePdf" class="btn btn-secondary" style="flex: 1;">📕 Download PDF</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
       </div>
 
-    </div>
+      <!-- System Health Indicator -->
+      <div class="glass-panel" style="margin-top: 2rem;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">💻 Node Server & API Health status</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; font-size: 0.9rem;" id="healthGrid">
+          <div><strong>Status:</strong> <span class="badge badge-success">Online</span></div>
+          <div><strong>Database:</strong> <span class="badge badge-success" id="healthDb">Connected</span></div>
+          <div><strong>Uptime:</strong> <span id="healthUptime">0s</span></div>
+          <div><strong>Memory Heap:</strong> <span id="healthMemory">0 MB</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. DISTRICTS CRUD TAB -->
+    <section id="tabDistricts" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">Manage Districts</h3>
+          <button class="btn btn-primary" onclick="openDistrictModal()">+ Add New District</button>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>District Name</th>
+                <th>District Code</th>
+                <th>Assigned Admin</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="districtsTableBody">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading districts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. DISTRICT ADMINS MANAGEMENT TAB -->
+    <section id="tabAdmins" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">District Administrative Staff</h3>
+          <button class="btn btn-primary" onclick="openAdminModal()">+ Create District Admin Account</button>
+        </div>
+        <p class="subtitle" style="text-align: left; margin-bottom: 1.5rem;">Each active district can have only one District Admin assigned to handle local mess registrations.</p>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Admin Name</th>
+                <th>Email Address</th>
+                <th>Assigned District</th>
+                <th>Active status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminsTableBody">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading administrators...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. USERS WHITELIST TAB -->
+    <section id="tabUsers" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">Global User Registry</h3>
+          <div style="display: flex; gap: 0.5rem; width: 100%; max-width: 400px;">
+            <input type="text" id="searchUserInput" class="form-input" placeholder="Search by name or email..." style="padding: 0.5rem 1rem;">
+            <button class="btn btn-accent" id="btnSearchUser" style="padding: 0.5rem 1rem;">Search</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Email Address</th>
+                <th>Role</th>
+                <th>District / Mess</th>
+                <th>Verified</th>
+                <th>Active status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading registered users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. SYSTEM SETTINGS TAB -->
+    <section id="tabSettings" class="tab-content">
+      <div class="glass-panel" style="max-width: 700px; margin: 0 auto;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">Global Settings Console</h3>
+        <form id="settingsForm">
+          <div class="form-group">
+            <label class="form-label" for="settingWebsiteName">Website Brand Name</label>
+            <input type="text" id="settingWebsiteName" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingOtpExpiry">OTP Expiration Window (Minutes)</label>
+            <input type="number" id="settingOtpExpiry" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingEmailSender">Verified Resend Sender Email</label>
+            <input type="text" id="settingEmailSender" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingAllowedEmails">Whitelisted Signup Emails (Comma-separated) [INACTIVE]</label>
+            <textarea id="settingAllowedEmails" class="form-input" rows="4" placeholder="email1@test.com, email2@test.com" required></textarea>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);">Currently inactive. All signups are allowed via OTP verification.</span>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Save Settings changes</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 6. SECURITY AUDIT LOGS TAB -->
+    <section id="tabLogs" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">Security System Logs</h3>
+          <button class="btn btn-accent" onclick="loadAuditLogs()" style="padding: 0.5rem 1rem;">↻ Refresh Logs</button>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Time (UTC)</th>
+                <th>Operator</th>
+                <th>Action Taken</th>
+                <th>Detailed Description</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Loading logs history...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <!-- Payment Modal Dialog -->
-  <dialog id="paymentDialog" class="glass-panel" style="max-width: 400px; margin: auto; padding: 2rem; border: 3px solid var(--accent-color);">
-    <h3 style="color: var(--primary-color); margin-bottom: 1rem; text-align: center;">Mark Payment</h3>
-    <form id="paymentForm" method="dialog">
-      <input type="hidden" id="modalBillId">
-      <div class="form-group">
-        <label for="selectPayMode" class="form-label">Payment Mode</label>
-        <select id="selectPayMode" required>
-          <option value="Cash">Cash</option>
-          <option value="Online">Online / UPI</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="inputTxnId" class="form-label">Transaction ID (Optional)</label>
-        <input type="text" id="inputTxnId" class="form-input" placeholder="e.g. UPI123456789">
-      </div>
-      <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('paymentDialog').close()" style="flex: 1;">Cancel</button>
-        <button type="submit" class="btn btn-primary" style="flex: 1;">Confirm Paid</button>
-      </div>
-    </form>
-  </dialog>
+  <!-- DISTRICT MODAL OVERLAY -->
+  <div class="overlay" id="districtOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;" id="districtModalTitle">Create New District</h3>
+      <form id="districtForm">
+        <input type="hidden" id="districtFormId">
+        <div class="form-group">
+          <label for="inputDistrictName" class="form-label">District Name</label>
+          <input type="text" id="inputDistrictName" class="form-input" placeholder="e.g. LUCKNOW" required>
+        </div>
+        <div class="form-group">
+          <label for="inputDistrictCode" class="form-label">District Code (Unique)</label>
+          <input type="text" id="inputDistrictCode" class="form-input" placeholder="e.g. LKO" required>
+        </div>
+        <div class="form-group">
+          <label for="selectDistrictStatus" class="form-label">Status</label>
+          <select id="selectDistrictStatus">
+            <option value="active" selected>Active / Operational</option>
+            <option value="inactive">Inactive / Suspended</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeDistrictModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save District</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-  <!-- Sticky Footer -->
+  <!-- DISTRICT ADMIN MODAL OVERLAY -->
+  <div class="overlay" id="adminOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Create District Admin Account</h3>
+      <form id="adminForm">
+        <div class="form-group">
+          <label for="adminFullName" class="form-label">Full Name</label>
+          <input type="text" id="adminFullName" class="form-input" placeholder="e.g. Inspector Sharma" required>
+        </div>
+        <div class="form-group">
+          <label for="adminEmail" class="form-label">Email Address</label>
+          <input type="email" id="adminEmail" class="form-input" placeholder="e.g. sharma@copash.shop" required>
+        </div>
+        <div class="form-group">
+          <label for="adminPassword" class="form-label">Temporary Login Password</label>
+          <input type="password" id="adminPassword" class="form-input" placeholder="Min 6 characters" required>
+        </div>
+        <div class="form-group">
+          <label for="adminDistrictId" class="form-label">Assigned District / Mess</label>
+          <select id="adminDistrictId" required>
+            <option value="" disabled selected>Select District</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeAdminModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Generate Admin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- USER EDIT MODAL OVERLAY -->
+  <div class="overlay" id="userEditOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Modify User Account Settings</h3>
+      <form id="userEditForm">
+        <input type="hidden" id="editUserId">
+        <div class="form-group">
+          <label for="editFullName" class="form-label">Full Name</label>
+          <input type="text" id="editFullName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label for="editEmail" class="form-label">Email Address</label>
+          <input type="email" id="editEmail" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label for="editDistrictId" class="form-label">Assigned District</label>
+          <select id="editDistrictId">
+            <option value="">No District Assigned (Super Admin)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="selectUserStatus" class="form-label">Account Status</label>
+          <select id="selectUserStatus">
+            <option value="active">Active</option>
+            <option value="inactive">Deactivated</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeUserEditModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Update User settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
   <footer>
-    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Built with Antigravity IDE. All rights reserved.</p>
+    <p>&copy; 2026 Mess Management System. Super Admin Control Suite. All rights reserved.</p>
   </footer>
 
   <script src="app.js"></script>
-  <script>
-    // Tab switching function
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-      });
-
-      document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
-    }
-  </script>
 </body>
+
 </html>

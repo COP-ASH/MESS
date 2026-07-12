@@ -1,11 +1,12 @@
 const { migrate } = require('drizzle-orm/node-postgres/migrator');
-const { db, pool } = require('./src/db/index');
+const { db, pool, seedDatabase } = require('./src/db/index');
 
 async function runMigrations() {
   console.log('>>> [DB MIGRATION - START] Running Drizzle migrations...');
   try {
     await migrate(db, { migrationsFolder: './drizzle' });
     console.log('>>> [DB MIGRATION - SUCCESS] Migrations completed successfully.');
+    await seedDatabase();
   } catch (error) {
     console.error('>>> [DB MIGRATION - ERROR] Migrations failed:', error);
     process.exit(1);

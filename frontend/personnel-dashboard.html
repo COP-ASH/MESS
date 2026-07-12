@@ -1,220 +1,279 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UP Police Mess Management - Personnel Portal</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- jsPDF for PDF generation -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <!-- jsPDF-AutoTable plugin for tables in PDF -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
+  <title>Personnel Profile - Mess Management</title>
+  <link rel="stylesheet" href="style.css?v=1.2">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
-<body>
 
-  <!-- Navigation Header -->
+<body class="dashboard-page">
+
+  <!-- Header -->
   <header>
-    <nav class="navbar" aria-label="Main Navigation">
-      <div class="nav-brand" id="userBrandHeader">UP Police Mess</div>
+    <nav class="navbar">
+      <div class="nav-brand" id="userBrandHeader">👮 MEMBER MESS PORTAL</div>
       <ul class="nav-links">
-        <li><a href="#" class="active">Dashboard</a></li>
-        <li><button id="btnLogout" class="btn btn-logout">Logout</button></li>
+        <li style="color: var(--text-secondary); font-size: 0.9rem;" id="userGreeting">Loading Member Profile...</li>
+        <li style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.85; border-left: 1px solid var(--glass-border); padding-left: 1rem;" id="currentTimeDisplay">--:--</li>
+        <li><button class="btn btn-accent" id="btnLogout" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Logout</button></li>
       </ul>
     </nav>
   </header>
 
-  <!-- Main Body Content -->
+  <!-- Main container -->
   <main>
-    <!-- Welcome Header banner -->
-    <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem; border-left: 5px solid var(--accent-color);">
-      <h3 style="color: var(--primary-color);" id="welcomeMessage">Welcome, Officer</h3>
-      <p style="color: var(--text-secondary); font-size: 0.9rem;" id="userRankPno">Rank: PNO: </p>
-    </div>
+    <!-- Navigation Tabs -->
+    <nav class="tab-container" aria-label="Member Portal Tabs">
+      <button class="tab-btn active" onclick="switchTab('tabDistrictInfo')">My Mess / District Info</button>
+      <button class="tab-btn" onclick="switchTab('tabMemberMenu')">Weekly Mess Menu</button>
+      <button class="tab-btn" onclick="switchTab('tabMemberAttendance')">My Attendance History</button>
+      <button class="tab-btn" onclick="switchTab('tabNilDiet')">Nil Diet Requests</button>
+      <button class="tab-btn" onclick="switchTab('tabMemberBills')">My Monthly Bills</button>
+      <button class="tab-btn" onclick="switchTab('tabProfile')">Edit Profile</button>
+      <button class="tab-btn" onclick="switchTab('tabPassword')">Change Password</button>
+    </nav>
 
-    <!-- Main Grid Layout -->
-    <div class="dashboard-grid">
-      
-      <!-- Left Column: Attendance, Menu and Billing -->
-      <div class="col-8">
+    <!-- Global alert messages -->
+    <div id="statusMessage" class="message" role="alert" style="margin-bottom: 2rem;"></div>
+
+    <!-- 1. DISTRICT INFO & ANNOUNCEMENTS TAB -->
+    <section id="tabDistrictInfo" class="tab-content active">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
         
-        <!-- Tabbed Container -->
-        <div class="tab-container">
-          <button class="tab-btn active" onclick="switchTab('tabMenu')">Weekly Menu</button>
-          <button class="tab-btn" onclick="switchTab('tabAttendance')">Mark Attendance</button>
-          <button class="tab-btn" onclick="switchTab('tabBills')">Billing & Payments</button>
-        </div>
-
-        <div id="statusMessage" class="message" style="display: none;" role="alert"></div>
-
-        <!-- Tab 1: Weekly Menu -->
-        <div id="tabMenu" class="tab-content active">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 0;">Weekly Mess Menu</h3>
-            <button onclick="exportTableToPDF('personalMenuTable', 'weekly_menu.pdf', 'UP Police Mess - Weekly Menu')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <div class="table-responsive">
-            <table id="personalMenuTable">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th>Breakfast</th>
-                  <th>Lunch</th>
-                  <th>Dinner</th>
-                </tr>
-              </thead>
-              <tbody id="menuTableBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
+        <!-- District details Card -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">🏠 Mess Details</h3>
+          <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.95rem;">
+            <div><strong>Assigned District:</strong> <span id="distNameText" style="color: var(--accent-light); font-weight: 600;">-</span></div>
+            <div><strong>District Code:</strong> <span id="distCodeText">-</span></div>
+            <div><strong>District status:</strong> <span class="badge" id="distStatusBadge">-</span></div>
+            <div style="border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 0.5rem;">
+              <strong>District Mess Admin:</strong>
+              <div id="distAdminName" style="margin-top: 0.25rem; font-weight: 600;">-</div>
+              <div id="distAdminEmail" style="color: var(--text-secondary); font-size: 0.85rem;">-</div>
+            </div>
           </div>
         </div>
 
-        <!-- Tab 2: Mark Attendance -->
-        <div id="tabAttendance" class="tab-content">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Log Daily Meals</h3>
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-            Please check the checkboxes for the meals you will consume for the selected date. You can update your choices at any time.
-          </p>
-          <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
-            <form id="attendanceForm">
-              <div class="form-group" style="max-width: 250px;">
-                <label for="inputAttendanceDate" class="form-label">Select Date</label>
-                <input type="date" id="inputAttendanceDate" class="form-input" required>
-              </div>
-
-              <div style="display: flex; gap: 2rem; margin: 1.5rem 0;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
-                  <input type="checkbox" id="checkBreakfast" style="width: 18px; height: 18px;"> Breakfast
-                </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
-                  <input type="checkbox" id="checkLunch" style="width: 18px; height: 18px;"> Lunch
-                </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
-                  <input type="checkbox" id="checkDinner" style="width: 18px; height: 18px;"> Dinner
-                </label>
-              </div>
-
-              <button type="submit" class="btn btn-primary">Log Attendance</button>
-            </form>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem 0;">
-            <h4 style="color: var(--primary-color); margin-bottom: 0;">Recent Consumption History</h4>
-            <button onclick="exportTableToPDF('personalAttendanceHistoryTable', 'attendance_history.pdf', 'UP Police Mess - Recent Consumption History')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <div class="table-responsive">
-            <table id="personalAttendanceHistoryTable">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Breakfast</th>
-                  <th>Lunch</th>
-                  <th>Dinner</th>
-                </tr>
-              </thead>
-              <tbody id="attendanceHistoryBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
+        <!-- Announcements / Bulletins -->
+        <div class="glass-panel" style="margin-bottom: 0; display: flex; flex-direction: column;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📢 Mess Notices & Updates</h3>
+          <div style="flex: 1; overflow-y: auto; max-height: 350px; display: flex; flex-direction: column; gap: 1rem;" id="noticesListContainer">
+            <p style="color: var(--text-secondary); text-align: center;">No notice announcements published for your district.</p>
           </div>
         </div>
-
-        <!-- Tab 3: Billing & Payments -->
-        <div id="tabBills" class="tab-content">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="color: var(--primary-color); margin-bottom: 0;">Monthly Billing History</h3>
-            <button onclick="exportTableToPDF('personalBillsTable', 'billing_history.pdf', 'UP Police Mess - Monthly Billing History')" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">📄 Download PDF</button>
-          </div>
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">
-            Review your dynamic monthly bill balances computed from your daily meal choices and set rates.
-          </p>
-          <div class="table-responsive">
-            <table id="personalBillsTable">
-              <thead>
-                <tr>
-                  <th>Billing Period</th>
-                  <th>Total Meals</th>
-                  <th>Total Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="billsTableBody">
-                <!-- Loaded dynamically -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </div>
+    </section>
 
-      <!-- Right Column: Profile & Official Notices -->
-      <div class="col-4" style="display: flex; flex-direction: column; gap: 2rem;">
+    <!-- 4. WEEKLY MESS MENU TAB -->
+    <section id="tabMemberMenu" class="tab-content">
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📅 Weekly Mess Menu</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th style="text-align: center;">Morning Normal</th>
+                <th style="text-align: center;">Evening Normal</th>
+                <th style="text-align: center;">Morning HalfSpecial</th>
+                <th style="text-align: center;">Evening HalfSpecial</th>
+                <th style="text-align: center;">Morning FullSpecial</th>
+                <th style="text-align: center;">Evening FullSpecial</th>
+              </tr>
+            </thead>
+            <tbody id="memberMenuTableBody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading weekly menu...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. MARK ATTENDANCE TAB -->
+    <section id="tabMemberAttendance" class="tab-content">
+
+      <!-- Attendance History -->
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 0.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📜 My Attendance History</h3>
         
-        <!-- Personal Profile Card -->
-        <div class="glass-panel" style="padding: 1.5rem; background: white; border: 1px solid var(--border-color);">
-          <h3 style="margin-bottom: 1.25rem; color: var(--primary-color);">Update Profile Details</h3>
-          <form id="profileForm">
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label for="memberHistoryMonth" style="font-size: 0.9rem; color: var(--text-secondary);">Month:</label>
+            <select id="memberHistoryMonth" class="form-input" style="width: auto; padding: 0.4rem 0.8rem;">
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label for="memberHistoryYear" style="font-size: 0.9rem; color: var(--text-secondary);">Year:</label>
+            <input type="number" id="memberHistoryYear" class="form-input" value="2026" style="width: 90px; padding: 0.4rem 0.6rem;">
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th style="text-align: center;">Morning Normal</th>
+                <th style="text-align: center;">Evening Normal</th>
+                <th style="text-align: center;">Morning HalfSpecial</th>
+                <th style="text-align: center;">Evening HalfSpecial</th>
+                <th style="text-align: center;">Morning FullSpecial</th>
+                <th style="text-align: center;">Evening FullSpecial</th>
+              </tr>
+            </thead>
+            <tbody id="memberAttendanceTableBody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading attendance history...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. MY MONTHLY BILLS TAB -->
+    <section id="tabMemberBills" class="tab-content">
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">💸 My Monthly Bills</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Billing Period (MM/YYYY)</th>
+                <th>Meals Eaten</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Date Generated</th>
+              </tr>
+            </thead>
+            <tbody id="memberBillsTableBody">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Loading monthly bills...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. EDIT PROFILE TAB -->
+    <section id="tabProfile" class="tab-content">
+      <div class="glass-panel" style="max-width: 500px; margin: 0 auto;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">Personal Profile Settings</h3>
+        <form id="profileUpdateForm">
+          <div class="form-group">
+            <label for="inputEmailStatic" class="form-label">Email Address (Static)</label>
+            <input type="text" id="inputEmailStatic" class="form-input" disabled style="background: rgba(255,255,255,0.02); opacity: 0.7;">
+          </div>
+          <div class="form-group">
+            <label for="inputFullName" class="form-label">Full Name</label>
+            <input type="text" id="inputFullName" class="form-input" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Save Profile Settings</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 3. CHANGE PASSWORD TAB -->
+    <section id="tabPassword" class="tab-content">
+      <div class="glass-panel" style="max-width: 500px; margin: 0 auto;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">Update Password</h3>
+        <form id="passwordChangeForm">
+          <div class="form-group">
+            <label for="inputCurrentPassword" class="form-label">Current Password</label>
+            <input type="password" id="inputCurrentPassword" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label for="inputNewPassword" class="form-label">New Password</label>
+            <input type="password" id="inputNewPassword" class="form-input" placeholder="Min 6 characters" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Update Password</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 7. NIL DIET REQUESTS TAB -->
+    <section id="tabNilDiet" class="tab-content">
+      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+        <!-- Nil Diet Form -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">🛑 Request Nil Diet</h3>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+            Submit a request to set all meals for a selected date range to 'Nil' (No). Once the district admin approves, the billing charges for those days will be zeroed.
+          </p>
+          <div id="nilDietCutoffNotice" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; background: rgba(29, 78, 216, 0.05); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border-left: 4px solid var(--accent-color);">
+            <strong>District Nil Diet Cutoff Rules:</strong><br>
+            • Morning Diet: Before <span id="cutoffNoticeMorning" style="color: var(--accent-color); font-weight: 700;">--:--</span> of same day.<br>
+            • Evening Diet: Before <span id="cutoffNoticeEvening" style="color: var(--accent-color); font-weight: 700;">--:--</span> of same day.
+          </div>
+          <form id="nilDietForm">
             <div class="form-group">
-              <label for="profileName" class="form-label">Full Name</label>
-              <input type="text" id="profileName" class="form-input" required>
+              <label for="nilFromDate" class="form-label">From Date</label>
+              <input type="text" id="nilFromDate" class="form-input" placeholder="Select Start Date" required>
             </div>
             <div class="form-group">
-              <label for="profileRank" class="form-label">Rank</label>
-              <select id="profileRank" required>
-                <option value="Constable">Constable</option>
-                <option value="Head Constable">Head Constable</option>
-                <option value="Sub-Inspector">Sub-Inspector</option>
-                <option value="Inspector">Inspector</option>
-                <option value="Mess Staff">Mess Staff</option>
-                <option value="Admin">Admin / Mess In-Charge</option>
-              </select>
+              <label for="nilToDate" class="form-label">Till Date</label>
+              <input type="text" id="nilToDate" class="form-input" placeholder="Select End Date" required>
             </div>
-            <div class="form-group">
-              <label for="profilePostingUnit" class="form-label">Posting Unit</label>
-              <input type="text" id="profilePostingUnit" class="form-input" required>
+            <div class="form-group" style="margin-top: 1.25rem; margin-bottom: 1.25rem;">
+              <label class="form-label" style="margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 600;">Select Sessions</label>
+              <div style="display: flex; gap: 1.5rem; align-items: center;">
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilMorningDiet" style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: var(--accent-color);" checked> Morning
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilEveningDiet" style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: var(--accent-color);" checked> Evening
+                </label>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="profileMobile" class="form-label">Mobile Number</label>
-              <input type="text" id="profileMobile" class="form-input" required>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Save Changes</button>
+            <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 1rem;">Submit Request</button>
           </form>
         </div>
 
-        <!-- Official Notices Feed -->
-        <div class="notice-board">
-          <h3 style="margin-bottom: 1rem; color: var(--primary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 0.5rem;">
-            📢 Official Mess Board
-          </h3>
-          <div id="noticesFeed">
-            <!-- Loaded dynamically -->
+        <!-- History / Log Table -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📜 Nil Diet Request History</h3>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: center;">From Date</th>
+                  <th style="text-align: center;">Till Date</th>
+                  <th style="text-align: center;">Session(s)</th>
+                  <th style="text-align: center;">Status</th>
+                  <th style="text-align: center;">Submitted At</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="nilDietHistoryBody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No requests submitted yet.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-
       </div>
-
-    </div>
+    </section>
   </main>
 
-  <!-- Sticky Footer -->
+  <!-- Footer -->
   <footer>
-    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Built with Antigravity IDE. All rights reserved.</p>
+    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Member Portal. All rights reserved.</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="app.js"></script>
-  <script>
-    // Tab switching function
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-      });
-
-      document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
-    }
-  </script>
 </body>
+
 </html>

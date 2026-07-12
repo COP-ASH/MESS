@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * UP Police Mess Management - Core Frontend Scripts
+ * Mess Management System - Core Frontend Script
  * ==========================================================================
  */
 
@@ -8,29 +8,46 @@ const BACKEND_BASE_URL = window.location.hostname === "localhost" || window.loca
   ? "http://localhost:5000"
   : "https://mess-rjcn.onrender.com";
 
+// Global cache
+let activeDistrictsList = [];
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('>>> [INIT] Application initialized. Base URL:', BACKEND_BASE_URL);
 
-  // Setup Global Logout Button
+  // Start Live Timezone Clock
+  startLiveClock();
+
+  // Setup Global Logout Buttons
   const btnLogout = document.getElementById('btnLogout');
   if (btnLogout) {
     btnLogout.addEventListener('click', logout);
   }
 
+  // Determine current page and initialize scripts
+  const path = window.location.pathname;
+  const page = path.substring(path.lastIndexOf('/') + 1);
+
   // Route page actions
   if (document.getElementById('loginForm')) {
+    checkLoggedInRedirect();
     initLoginPage();
   } else if (document.getElementById('registrationForm')) {
+    checkLoggedInRedirect();
     initRegisterPage();
-  } else if (document.getElementById('userBrandHeader')) {
-    initPersonnelDashboard();
-  } else if (document.getElementById('adminBillsTableBody')) {
+  } else if (page === 'admin-dashboard.html') {
+    requireAuth('super_admin');
     initAdminDashboard();
+  } else if (page === 'district-dashboard.html') {
+    requireAuth('district_admin');
+    initDistrictDashboard();
+  } else if (page === 'personnel-dashboard.html') {
+    requireAuth('user');
+    initPersonnelDashboard();
   }
 });
 
 /* ==========================================================================
-   Helper Functions (Security & Notifications)
+   Helper Functions (Auth & Routing)
    ========================================================================== */
 
 function getAuthHeaders() {
@@ -41,8 +58,64 @@ function getAuthHeaders() {
   };
 }
 
-function showNotification(message, type = 'info', duration = 4000) {
-  const statusMessage = document.getElementById('statusMessage');
+function checkLoggedInRedirect() {
+  const token = localStorage.getItem('token');
+  const userStr = localStorage.getItem('user');
+  if (token && userStr) {
+    const user = JSON.parse(userStr);
+    redirectToDashboard(user.role);
+  }
+}
+
+function requireAuth(allowedRole) {
+  const token = localStorage.getItem('token');
+  const userStr = localStorage.getItem('user');
+  if (!token || !userStr) {
+    logout();
+    return;
+  }
+  const user = JSON.parse(userStr);
+  if (user.role !== allowedRole) {
+    redirectToDashboard(user.role);
+  }
+}
+
+function redirectToDashboard(role) {
+  if (role === 'super_admin') {
+    window.location.href = 'admin-dashboard.html';
+  } else if (role === 'district_admin') {
+    window.location.href = 'district-dashboard.html';
+  } else {
+    window.location.href = 'personnel-dashboard.html';
+  }
+}
+
+function startLiveClock() {
+  const timeEl = document.getElementById('currentTimeDisplay');
+  if (!timeEl) return;
+
+  const updateTime = () => {
+    const now = new Date();
+    const options = {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    };
+    let formatted = now.toLocaleDateString('en-IN', options);
+    formatted = formatted.toUpperCase();
+    timeEl.innerText = `${formatted} (IST)`;
+  };
+
+  updateTime();
+  setInterval(updateTime, 1000);
+}
+
+function showNotification(message, type = 'info', elementId = 'statusMessage', duration = 4000) {
+  const statusMessage = document.getElementById(elementId);
   if (!statusMessage) return;
 
   statusMessage.className = `message message-${type}`;
@@ -57,10 +130,38 @@ function showNotification(message, type = 'info', duration = 4000) {
 }
 
 function logout() {
-  console.log('>>> [LOGOUT] Ending session.');
+  console.log('>>> [LOGOUT] Terminating session.');
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (refreshToken) {
+    fetch(`${BACKEND_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    }).catch(err => console.error('Logout error:', err));
+  }
   localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
   window.location.href = 'login.html';
+}
+
+// Switch tabs globally
+function switchTab(tabId) {
+  // Hide all tab contents
+  const contents = document.querySelectorAll('.tab-content');
+  contents.forEach(c => c.classList.remove('active'));
+
+  // Remove active class from buttons
+  const buttons = document.querySelectorAll('.tab-btn');
+  buttons.forEach(b => b.classList.remove('active'));
+
+  // Activate selected tab content
+  document.getElementById(tabId).classList.add('active');
+
+  // Activate selected tab button
+  // Find button calling this function
+  const activeBtn = Array.from(buttons).find(b => b.getAttribute('onclick').includes(tabId));
+  if (activeBtn) activeBtn.classList.add('active');
 }
 
 /* ==========================================================================
@@ -73,7 +174,7 @@ const isSpeechSupported = !!SpeechRecognition;
 function setupVoiceField(buttonId, inputId) {
   const btn = document.getElementById(buttonId);
   const input = document.getElementById(inputId);
-  
+
   if (!btn || !input) return;
 
   if (!isSpeechSupported) {
@@ -84,7 +185,7 @@ function setupVoiceField(buttonId, inputId) {
 
   const recognition = new SpeechRecognition();
   recognition.continuous = false;
-  recognition.lang = 'en-IN'; // Optimized for Indian English
+  recognition.lang = 'en-IN';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
@@ -96,8 +197,8 @@ function setupVoiceField(buttonId, inputId) {
     }
 
     btn.classList.add('listening');
-    showNotification('Listening (Speak Name/PNO/Mobile)...', 'info', 2000);
-    
+    showNotification('Listening (Speak Name Clearly)...', 'info', 'statusMessage', 2000);
+
     try {
       recognition.start();
     } catch (err) {
@@ -109,37 +210,19 @@ function setupVoiceField(buttonId, inputId) {
   recognition.onresult = (event) => {
     let transcript = event.results[0][0].transcript;
     console.log(`[Speech API] Recorded: ${transcript}`);
-    
+
     if (transcript.endsWith('.')) {
       transcript = transcript.slice(0, -1);
     }
-    
-    // Clean spaces for PNO and mobile numbers
-    if (inputId === 'inputPNO' || inputId === 'inputMobile') {
-      transcript = transcript.replace(/\s+/g, '');
-    }
-    
+
     input.value = transcript.toUpperCase();
-    showNotification(`Recorded: "${transcript}"`, 'success', 2000);
+    showNotification(`Recorded: "${transcript}"`, 'success', 'statusMessage', 2000);
   };
 
   recognition.onerror = (event) => {
     console.error(`[Speech API] Error:`, event.error);
     btn.classList.remove('listening');
-    
-    let errMsg = `Voice input error: ${event.error}`;
-    if (event.error === 'not-allowed') {
-      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        errMsg = 'Voice recognition requires a secure connection (HTTPS). Please access the site via HTTPS.';
-      } else {
-        errMsg = 'Microphone access denied. Please allow microphone permissions in your browser.';
-      }
-    } else if (event.error === 'no-speech') {
-      errMsg = 'No speech detected. Please speak clearly into the microphone.';
-    } else if (event.error === 'audio-capture') {
-      errMsg = 'No microphone detected. Please connect a microphone and try again.';
-    }
-    showNotification(errMsg, 'error');
+    showNotification(`Voice input error: ${event.error}`, 'error');
   };
 
   recognition.onend = () => {
@@ -153,22 +236,22 @@ function setupVoiceField(buttonId, inputId) {
 
 function initLoginPage() {
   const form = document.getElementById('loginForm');
-  
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    const loginId = document.getElementById('inputLoginId').value.trim();
+
+    const email = document.getElementById('inputEmail').value.trim();
     const password = document.getElementById('inputPassword').value.trim();
-    
+
     const btn = document.getElementById('btnLogin');
     btn.disabled = true;
-    btn.innerText = 'Verifying Credentials...';
+    btn.innerText = 'Authenticating Credentials...';
 
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginId, password })
+        body: JSON.stringify({ email, password })
       });
 
       const data = await response.json();
@@ -176,25 +259,102 @@ function initLoginPage() {
         throw new Error(data.error || 'Login verification failed.');
       }
 
-      // Save token and user info
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Save session info
+      localStorage.setItem('token', data.data.token);
+      localStorage.setItem('refreshToken', data.data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
 
-      showNotification('Success! Opening dashboard...', 'success');
-      
+      showNotification('Success! Opening portal...', 'success');
+
       setTimeout(() => {
-        if (data.user.roleName === 'Admin') {
-          window.location.href = 'admin-dashboard.html';
-        } else {
-          window.location.href = 'personnel-dashboard.html';
-        }
+        redirectToDashboard(data.data.user.role);
       }, 1000);
 
     } catch (err) {
       showNotification(err.message, 'error');
       btn.disabled = false;
-      btn.innerText = 'Log In securely';
+      btn.innerText = 'Log In Securely';
     }
+  });
+
+  // Password reset flow triggers
+  const resetOverlay = document.getElementById('resetOverlay');
+  const linkForgot = document.getElementById('linkForgotPassword');
+  const btnCancelReset = document.getElementById('btnCancelReset');
+
+  if (linkForgot && resetOverlay) {
+    linkForgot.addEventListener('click', (e) => {
+      e.preventDefault();
+      resetOverlay.classList.add('active');
+      document.getElementById('forgotForm').style.display = 'block';
+      document.getElementById('resetConfirmForm').style.display = 'none';
+    });
+
+    btnCancelReset.addEventListener('click', () => {
+      resetOverlay.classList.remove('active');
+    });
+  }
+
+  // Handle forgot form OTP request
+  const forgotForm = document.getElementById('forgotForm');
+  forgotForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value.trim();
+    const btn = document.getElementById('btnSendResetOtp');
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || 'Request failed.');
+
+      showNotification('Recovery code sent to email.', 'success', 'resetStatusMessage');
+      forgotForm.style.display = 'none';
+      document.getElementById('resetConfirmForm').style.display = 'block';
+    } catch (err) {
+      showNotification(err.message, 'error', 'resetStatusMessage');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Handle reset confirm form submit
+  const resetConfirmForm = document.getElementById('resetConfirmForm');
+  resetConfirmForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value.trim();
+    const otp = document.getElementById('resetOtp').value.trim();
+    const newPassword = document.getElementById('resetNewPassword').value.trim();
+    const btn = document.getElementById('btnConfirmReset');
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword })
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || 'Reset failed.');
+
+      showNotification('Password updated successfully. Login with your new password.', 'success', 'resetStatusMessage');
+      setTimeout(() => {
+        resetOverlay.classList.remove('active');
+      }, 2000);
+    } catch (err) {
+      showNotification(err.message, 'error', 'resetStatusMessage');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnBackToForgot').addEventListener('click', () => {
+    forgotForm.style.display = 'block';
+    resetConfirmForm.style.display = 'none';
   });
 }
 
@@ -204,17 +364,35 @@ function initLoginPage() {
 
 function initRegisterPage() {
   setupVoiceField('btnMicName', 'inputName');
-  setupVoiceField('btnMicPNO', 'inputPNO');
-  setupVoiceField('btnMicMobile', 'inputMobile');
 
+  // Load active districts dynamically
+  const selectDistrict = document.getElementById('selectDistrict');
+
+  const loadDistricts = async () => {
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/districts/public`);
+      const data = await response.json();
+      if (response.ok) {
+        selectDistrict.innerHTML = '<option value="" disabled selected>Select Mess / District</option>';
+        data.data.forEach(d => {
+          selectDistrict.innerHTML += `<option value="${d.id}">${d.districtName} (${d.districtCode})</option>`;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load active districts:', err);
+      selectDistrict.innerHTML = '<option value="" disabled>Failed to load districts. Refresh page.</option>';
+    }
+  };
+
+  loadDistricts();
+
+  // Send OTP
   const btnSendOtp = document.getElementById('btnSendOtp');
   const otpSection = document.getElementById('otpSection');
-  const form = document.getElementById('registrationForm');
+  const emailInput = document.getElementById('inputEmail');
 
-  btnSendOtp.addEventListener('click', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('inputEmail').value.trim();
-
+  btnSendOtp.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
     if (!email) {
       showNotification('Please enter a valid email address first.', 'error');
       return;
@@ -224,21 +402,19 @@ function initRegisterPage() {
     btnSendOtp.innerText = 'Sending...';
 
     try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/auth/otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
-
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to dispatch OTP.');
       }
 
-      showNotification(data.message, 'success', 0);
+      showNotification('Verification OTP sent. Check your email inbox.', 'success', 'statusMessage', 15000);
       otpSection.style.display = 'block';
-      document.getElementById('inputOtp').focus();
-
+      emailInput.disabled = true;
     } catch (err) {
       showNotification(err.message, 'error');
     } finally {
@@ -247,577 +423,880 @@ function initRegisterPage() {
     }
   });
 
+  // Submit registration form
+  const form = document.getElementById('registrationForm');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const name = document.getElementById('inputName').value.trim();
-    const pno = document.getElementById('inputPNO').value.trim();
-    const rank = document.getElementById('selectRank').value;
-    const postingUnit = document.getElementById('inputPostingUnit').value.trim();
-    const mobile = document.getElementById('inputMobile').value.trim();
-    const email = document.getElementById('inputEmail').value.trim();
+    const fullName = document.getElementById('inputName').value.trim();
+    const email = emailInput.value.trim();
+    const districtId = parseInt(selectDistrict.value);
     const password = document.getElementById('inputPassword').value.trim();
     const otp = document.getElementById('inputOtp').value.trim();
 
-    if (!name || !pno || !rank || !postingUnit || !mobile || !email || !password || !otp) {
-      showNotification('All registration fields are required.', 'error');
+    if (!fullName || !email || !districtId || !password || !otp) {
+      showNotification('Please complete all form fields.', 'error');
       return;
     }
 
-    const btnRegister = document.getElementById('btnRegister');
-    btnRegister.disabled = true;
-    btnRegister.innerText = 'Registering Officer...';
+    const btn = document.getElementById('btnRegister');
+    btn.disabled = true;
+    btn.innerText = 'Verifying Record...';
 
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, pno, rank, postingUnit, mobile, email, password, otp })
+        body: JSON.stringify({ fullName, email, password, districtId, otp })
       });
-
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Registration failed.');
       }
 
-      showNotification(data.message, 'success', 0);
-      form.reset();
-      otpSection.style.display = 'none';
-
+      showNotification('Account verified and created successfully! Redirecting to login...', 'success');
+      setTimeout(() => {
+        window.location.href = 'login.html';
+      }, 2000);
     } catch (err) {
       showNotification(err.message, 'error');
-      btnRegister.disabled = false;
-      btnRegister.innerText = 'Verify OTP & Submit Record';
+      btn.disabled = false;
+      btn.innerText = 'Verify OTP & Submit Record';
     }
   });
 }
 
 /* ==========================================================================
-   3. Police Personnel Dashboard (personnel-dashboard.html)
+   3. Super Admin Dashboard (admin-dashboard.html)
    ========================================================================== */
 
-async function initPersonnelDashboard() {
-  const token = localStorage.getItem('token');
-  const userJson = localStorage.getItem('user');
+function initAdminDashboard() {
+  const user = JSON.parse(localStorage.getItem('user'));
+  document.getElementById('userGreeting').innerText = `Welcome, Super Admin | ${user.fullName}`;
 
-  if (!token || !userJson) {
-    window.location.href = 'login.html';
-    return;
-  }
+  // Initial load
+  loadDashboardAnalytics();
+  loadDistrictsTable();
+  loadAdminsTable();
+  loadUsersTable();
+  loadAuditLogs();
+  loadDistrictListForAdminsSelect();
 
-  const user = JSON.parse(userJson);
-  
-  // Set headers
-  document.getElementById('userBrandHeader').innerText = `UP Police Mess | ${user.name}`;
-  document.getElementById('welcomeMessage').innerText = `Welcome, ${user.rank} ${user.name}`;
+  // Search User binding
+  document.getElementById('btnSearchUser').addEventListener('click', () => {
+    const q = document.getElementById('searchUserInput').value.trim();
+    loadUsersTable(q);
+  });
 
-  // 1. Fetch Profile Info & Fill Form
-  await loadUserProfile();
+  // Settings form binding
+  loadSettings();
+  const settingsForm = document.getElementById('settingsForm');
+  settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const website_name = document.getElementById('settingWebsiteName').value;
+    const otp_expiry_minutes = document.getElementById('settingOtpExpiry').value;
+    const email_sender = document.getElementById('settingEmailSender').value;
+    const allowed_emails = document.getElementById('settingAllowedEmails').value;
 
-  // 2. Fetch Weekly Menu
-  await loadWeeklyMenu();
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/settings`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ website_name, otp_expiry_minutes, email_sender, allowed_emails })
+      });
+      if (response.ok) {
+        showNotification('Settings configurations updated.', 'success');
+      } else {
+        const d = await response.json();
+        throw new Error(d.error || 'Failed to update settings.');
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
 
-  // 3. Fetch Notices Board
-  await loadNoticesFeed('noticesFeed');
+  // District Form binding
+  const distForm = document.getElementById('districtForm');
+  distForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('districtFormId').value;
+    const districtName = document.getElementById('inputDistrictName').value.trim();
+    const districtCode = document.getElementById('inputDistrictCode').value.trim();
+    const status = document.getElementById('selectDistrictStatus').value;
 
-  // 4. Fetch Personal Bills list
-  await loadPersonalBills();
+    const url = id ? `${BACKEND_BASE_URL}/api/districts/${id}` : `${BACKEND_BASE_URL}/api/districts`;
+    const method = id ? 'PUT' : 'POST';
 
-  // 5. Initialize Attendance form date
-  initAttendanceSection();
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ districtName, districtCode, status })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save district.');
+
+      showNotification('District saved successfully.', 'success');
+      closeDistrictModal();
+      loadDistrictsTable();
+      loadDashboardAnalytics();
+      loadDistrictListForAdminsSelect();
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // District Admin Form binding
+  const adminForm = document.getElementById('adminForm');
+  adminForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fullName = document.getElementById('adminFullName').value.trim();
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value.trim();
+    const districtId = parseInt(document.getElementById('adminDistrictId').value);
+    const role = 'district_admin';
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/users`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ fullName, email, password, districtId, role })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create admin account.');
+
+      showNotification('District Admin account created & assigned successfully.', 'success');
+      closeAdminModal();
+      loadAdminsTable();
+      loadDistrictsTable(); // Recalculate assigned admin list
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Edit User Form binding
+  const userEditForm = document.getElementById('userEditForm');
+  userEditForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editUserId').value;
+    const fullName = document.getElementById('editFullName').value.trim();
+    const email = document.getElementById('editEmail').value.trim();
+    const districtIdVal = document.getElementById('editDistrictId').value;
+    const districtId = districtIdVal ? parseInt(districtIdVal) : null;
+    const status = document.getElementById('selectUserStatus').value;
+    const isActive = status === 'active';
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/users/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ fullName, email, districtId, isActive })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update user.');
+
+      showNotification('User profile settings updated.', 'success');
+      closeUserEditModal();
+      loadUsersTable();
+      loadAdminsTable(); // Might have changed admin district
+      loadDistrictsTable();
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
 }
 
-async function loadUserProfile() {
+// Global analytics loader for Super Admin
+let userDistributionChartInstance = null;
+let dailyRegsChartInstance = null;
+
+async function loadDashboardAnalytics() {
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/users/profile`, {
-      headers: getAuthHeaders()
+    const response = await fetch(`${BACKEND_BASE_URL}/api/dashboard`, { headers: getAuthHeaders() });
+    const resData = await response.json();
+    if (!response.ok) throw new Error(resData.error);
+
+    const data = resData.data;
+
+    // Compile widgets
+    document.getElementById('statTotalDistricts').innerText = data.totalDistricts;
+    document.getElementById('statActiveDistricts').innerText = data.activeDistricts;
+    document.getElementById('statInactiveDistricts').innerText = data.inactiveDistricts;
+    document.getElementById('statTotalUsers').innerText = data.totalUsers;
+
+    // Load node health stats
+    document.getElementById('healthDb').className = `badge badge-${data.systemHealth.database === 'healthy' ? 'success' : 'danger'}`;
+    document.getElementById('healthDb').innerText = data.systemHealth.database === 'healthy' ? 'Connected' : 'Offline';
+    document.getElementById('healthUptime').innerText = `${Math.floor(data.systemHealth.uptime)} seconds`;
+    document.getElementById('healthMemory').innerText = `${(data.systemHealth.memoryUsage / 1024 / 1024).toFixed(2)} MB`;
+
+    // Render Charts
+    // 1. User distribution by district
+    const distLabels = data.usersByDistrict.map(item => item.districtName || 'Unassigned');
+    const distCounts = data.usersByDistrict.map(item => parseInt(item.count));
+
+    if (userDistributionChartInstance) userDistributionChartInstance.destroy();
+    const ctx1 = document.getElementById('chartUserDistribution').getContext('2d');
+    userDistributionChartInstance = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: distLabels,
+        datasets: [{
+          label: 'Mess Personnel Counts',
+          data: distCounts,
+          backgroundColor: '#6366f1',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', precision: 0, stepSize: 1 } },
+          x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+        }
+      }
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
 
-    // Populate header details
-    document.getElementById('userRankPno').innerText = `Designation/Rank: ${data.rank} | Personal Number (PNO): ${data.pno} | Unit: ${data.postingUnit}`;
-    
-    // Also update welcome message to avoid undefined rank display
-    const welcomeMessage = document.getElementById('welcomeMessage');
-    if (welcomeMessage) {
-      welcomeMessage.innerText = `Welcome, ${data.rank} ${data.name}`;
-    }
-    
-    // Fill Profile update form
-    document.getElementById('profileName').value = data.name;
-    document.getElementById('profileRank').value = data.rank;
-    document.getElementById('profilePostingUnit').value = data.postingUnit;
-    document.getElementById('profileMobile').value = data.mobile;
+    // 2. Daily registrations (last 30 days)
+    const regDates = data.dailyRegistrations.map(item => item.date.split('T')[0]);
+    const regCounts = data.dailyRegistrations.map(item => parseInt(item.count));
 
-    // Attach profile update submit
-    const profileForm = document.getElementById('profileForm');
-    profileForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = document.getElementById('profileName').value.trim();
-      const rank = document.getElementById('profileRank').value;
-      const postingUnit = document.getElementById('profilePostingUnit').value.trim();
-      const mobile = document.getElementById('profileMobile').value.trim();
-
-      try {
-        const updateRes = await fetch(`${BACKEND_BASE_URL}/api/users/profile`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ name, rank, postingUnit, mobile })
-        });
-        const updateData = await updateRes.json();
-        if (!updateRes.ok) throw new Error(updateData.error);
-
-        showNotification('Profile updated successfully!', 'success');
-        // Refresh local cache name
-        const cachedUser = JSON.parse(localStorage.getItem('user'));
-        cachedUser.name = name;
-        cachedUser.rank = rank;
-        localStorage.setItem('user', JSON.stringify(cachedUser));
-        document.getElementById('userBrandHeader').innerText = `UP Police Mess | ${name}`;
-        document.getElementById('welcomeMessage').innerText = `Welcome, ${rank} ${name}`;
-      } catch (err) {
-        showNotification(err.message, 'error');
+    if (dailyRegsChartInstance) dailyRegsChartInstance.destroy();
+    const ctx2 = document.getElementById('chartDailyRegistrations').getContext('2d');
+    dailyRegsChartInstance = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: regDates,
+        datasets: [{
+          label: 'Registrations',
+          data: regCounts,
+          borderColor: '#ec4899',
+          backgroundColor: 'rgba(236,72,153,0.1)',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', precision: 0, stepSize: 1 } },
+          x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+        }
       }
     });
 
   } catch (err) {
-    console.error('Failed to load profile:', err);
+    console.error('Error compiling analytics:', err);
   }
 }
 
-async function loadWeeklyMenu() {
+// Districts CRUD ops
+async function loadDistrictsTable() {
+  const tbody = document.getElementById('districtsTableBody');
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/menu`, {
-      headers: getAuthHeaders()
-    });
+    const response = await fetch(`${BACKEND_BASE_URL}/api/districts`, { headers: getAuthHeaders() });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    const tbody = document.getElementById('menuTableBody');
-    if (tbody) {
-      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const todayIndex = new Date().getDay();
-      const todayName = daysOfWeek[todayIndex];
-
-      tbody.innerHTML = data.map(day => {
-        const isToday = day.dayOfWeek.toLowerCase() === todayName.toLowerCase();
-        const rowStyle = isToday ? 'style="background-color: rgba(207, 161, 64, 0.15); font-weight: 600;"' : '';
-        const todayIndicator = isToday ? ' <span class="badge badge-warning">Today</span>' : '';
-        
-        return `
-          <tr ${rowStyle}>
-            <td>${day.dayOfWeek}${todayIndicator}</td>
-            <td>${day.breakfast}</td>
-            <td>${day.lunch}</td>
-            <td>${day.dinner}</td>
+    if (response.ok) {
+      activeDistrictsList = data.data; // Save to global cache
+      tbody.innerHTML = '';
+      data.data.forEach(d => {
+        const badgeClass = d.status === 'active' ? 'success' : 'danger';
+        tbody.innerHTML += `
+          <tr>
+            <td>${d.id}</td>
+            <td><strong>${d.districtName}</strong></td>
+            <td><code style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px;">${d.districtCode}</code></td>
+            <td>${d.adminName || '<span style="color: var(--text-muted);">None Assigned</span>'}</td>
+            <td><span class="badge badge-${badgeClass}">${d.status}</span></td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="editDistrict(${d.id}, '${d.districtName}', '${d.districtCode}', '${d.status}')">Edit</button>
+              <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteDistrict(${d.id})">Delete</button>
+            </td>
           </tr>
         `;
-      }).join('');
-    }
-
-    // If we're on the admin dashboard, also load selectMenuDay dropdown
-    const selectMenuDay = document.getElementById('selectMenuDay');
-    if (selectMenuDay) {
-      selectMenuDay.innerHTML = '<option value="" disabled selected>Choose Day</option>' + 
-        data.map(day => `<option value="${day.id}">${day.dayOfWeek}</option>`).join('');
-
-      // When day changes, pre-fill inputs
-      selectMenuDay.addEventListener('change', () => {
-        const selected = data.find(d => d.id == selectMenuDay.value);
-        if (selected) {
-          document.getElementById('inputMenuBreakfast').value = selected.breakfast;
-          document.getElementById('inputMenuLunch').value = selected.lunch;
-          document.getElementById('inputMenuDinner').value = selected.dinner;
-        }
       });
     }
-
   } catch (err) {
-    console.error('Failed to load weekly menu:', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading districts list.</td></tr>';
   }
 }
 
-async function loadNoticesFeed(feedElementId) {
+// Districts Add/Edit Modal
+function openDistrictModal(id = '', name = '', code = '', status = 'active') {
+  document.getElementById('districtFormId').value = id;
+  document.getElementById('inputDistrictName').value = name;
+  document.getElementById('inputDistrictCode').value = code;
+  document.getElementById('selectDistrictStatus').value = status;
+  document.getElementById('districtModalTitle').innerText = id ? 'Edit District' : 'Create New District';
+  document.getElementById('districtOverlay').classList.add('active');
+}
+
+function closeDistrictModal() {
+  document.getElementById('districtOverlay').classList.remove('active');
+}
+
+function editDistrict(id, name, code, status) {
+  openDistrictModal(id, name, code, status);
+}
+
+async function deleteDistrict(id) {
+  if (!confirm('Are you sure you want to delete this district? This action cannot be undone.')) return;
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/notices`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/districts/${id}`, {
+      method: 'DELETE',
       headers: getAuthHeaders()
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    const feed = document.getElementById(feedElementId);
-    if (!feed) return;
-
-    if (data.length === 0) {
-      feed.innerHTML = '<p style="color: var(--text-secondary); text-align: center; font-size: 0.9rem;">No active notices on board.</p>';
-      return;
-    }
-
-    feed.innerHTML = data.map(notice => {
-      const dateStr = new Date(notice.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
-      return `
-        <div class="notice-item">
-          <div class="notice-title">${escapeHtml(notice.title)}</div>
-          <div class="notice-meta">Posted by: ${notice.postedByRank} ${notice.postedByName} on ${dateStr}</div>
-          <p class="notice-content">${escapeHtml(notice.content)}</p>
-        </div>
-      `;
-    }).join('');
-
-  } catch (err) {
-    console.error('Failed to load notices feed:', err);
-  }
-}
-
-async function loadPersonalBills() {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, {
-      headers: getAuthHeaders()
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    const tbody = document.getElementById('billsTableBody');
-    if (!tbody) return;
-
-    if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No generated billing records found.</td></tr>`;
-      return;
-    }
-
-    const months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    
-    tbody.innerHTML = data.map(bill => {
-      const statusBadge = bill.status === 'paid' 
-        ? '<span class="badge badge-success">Paid</span>' 
-        : '<span class="badge badge-danger">Unpaid</span>';
-      
-      return `
-        <tr>
-          <td>${months[bill.month]} ${bill.year}</td>
-          <td>${bill.totalMeals}</td>
-          <td>₹${bill.totalAmount}</td>
-          <td>${statusBadge}</td>
-        </tr>
-      `;
-    }).join('');
-
-  } catch (err) {
-    console.error('Failed to load personal bills:', err);
-  }
-}
-
-function initAttendanceSection() {
-  const dateInput = document.getElementById('inputAttendanceDate');
-  if (!dateInput) return;
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  dateInput.value = todayStr;
-
-  // Load attendance details for default date
-  fetchAndPopulateAttendance(todayStr);
-
-  dateInput.addEventListener('change', () => {
-    fetchAndPopulateAttendance(dateInput.value);
-  });
-
-  // Attach submit handler
-  const form = document.getElementById('attendanceForm');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const date = dateInput.value;
-    const breakfast = document.getElementById('checkBreakfast').checked;
-    const lunch = document.getElementById('checkLunch').checked;
-    const dinner = document.getElementById('checkDinner').checked;
-
-    try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/attendance`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ date, breakfast, lunch, dinner })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      showNotification('Meal choice updated successfully!', 'success');
-      loadAttendanceHistory(); // Refresh history log
-    } catch (err) {
-      showNotification(err.message, 'error');
-    }
-  });
-
-  // Load history log
-  loadAttendanceHistory();
-}
-
-async function fetchAndPopulateAttendance(date) {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/history`, {
-      headers: getAuthHeaders()
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    const record = data.find(r => r.date === date);
-    
-    // Clear and set checkboxes
-    document.getElementById('checkBreakfast').checked = record ? !!record.breakfast : false;
-    document.getElementById('checkLunch').checked = record ? !!record.lunch : false;
-    document.getElementById('checkDinner').checked = record ? !!record.dinner : false;
-  } catch (err) {
-    console.error('Failed to fetch attendance choice:', err);
-  }
-}
-
-async function loadAttendanceHistory() {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/history`, {
-      headers: getAuthHeaders()
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    const tbody = document.getElementById('attendanceHistoryBody');
-    if (!tbody) return;
-
-    if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No recent meal logs.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.slice(0, 10).map(r => {
-      const bIcon = r.breakfast ? '✅ Yes' : '❌ No';
-      const lIcon = r.lunch ? '✅ Yes' : '❌ No';
-      const dIcon = r.dinner ? '✅ Yes' : '❌ No';
-      return `
-        <tr>
-          <td>${r.date}</td>
-          <td>${bIcon}</td>
-          <td>${lIcon}</td>
-          <td>${dIcon}</td>
-        </tr>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Failed to load attendance history log:', err);
-  }
-}
-
-/* ==========================================================================
-   4. Mess Admin Dashboard (admin-dashboard.html)
-   ========================================================================== */
-
-async function initAdminDashboard() {
-  const token = localStorage.getItem('token');
-  const userJson = localStorage.getItem('user');
-
-  if (!token || !userJson) {
-    window.location.href = 'login.html';
-    return;
-  }
-
-  const user = JSON.parse(userJson);
-  if (user.roleName !== 'Admin') {
-    window.location.href = 'personnel-dashboard.html';
-    return;
-  }
-
-  // Load stats counters
-  await loadAdminStats();
-
-  // Load personnel lists
-  await loadPersonnelLists();
-
-  // Load weekly menu details (updates menu dropdown and edit inputs)
-  await loadWeeklyMenu();
-
-  // Attach Menu submit form
-  const updateMenuForm = document.getElementById('updateMenuForm');
-  updateMenuForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('selectMenuDay').value;
-    const breakfast = document.getElementById('inputMenuBreakfast').value.trim();
-    const lunch = document.getElementById('inputMenuLunch').value.trim();
-    const dinner = document.getElementById('inputMenuDinner').value.trim();
-
-    try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/menu/update`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ id, breakfast, lunch, dinner })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      showNotification('Mess Menu updated successfully!', 'success');
-      loadWeeklyMenu(); // refresh cache menu
-    } catch (err) {
-      showNotification(err.message, 'error');
-    }
-  });
-
-  // Load Per-Meal Rates & Attach Rates edit form
-  await loadMealRates();
-
-  // Load Ledger list & generate billing defaults
-  initBillingManagementSection();
-
-  // Load announcements notice list & attach create form
-  await loadNoticesFeed('adminNoticesFeed');
-  initAnnouncementsForm();
-
-  // Export report attach submit
-  initExportsSection();
-}
-
-async function loadAdminStats() {
-  try {
-    // 1. Fetch aggregate users list
-    const activeRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=active`, { headers: getAuthHeaders() });
-    const activeData = await activeRes.json();
-    
-    const pendingRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=pending`, { headers: getAuthHeaders() });
-    const pendingData = await pendingRes.json();
-
-    document.getElementById('statTotalUsers').innerText = activeData.length;
-    document.getElementById('statPendingApprovals').innerText = pendingData.length;
-
-    // 2. Fetch daily aggregate meals served summary
-    const summaryRes = await fetch(`${BACKEND_BASE_URL}/api/attendance/summary`, { headers: getAuthHeaders() });
-    const summaryData = await summaryRes.json();
-    document.getElementById('statDailyMeals').innerText = summaryData.grandTotal || 0;
-
-  } catch (err) {
-    console.error('Failed to load dashboard statistics:', err);
-  }
-}
-
-async function loadPersonnelLists() {
-  try {
-    // 1. Load pending users
-    const pendingRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=pending`, { headers: getAuthHeaders() });
-    const pendingData = await pendingRes.json();
-
-    const pendingTbody = document.getElementById('pendingUsersTableBody');
-    if (pendingData.length === 0) {
-      pendingTbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No pending user approvals.</td></tr>`;
+    if (response.ok) {
+      showNotification('District deleted successfully.', 'success');
+      loadDistrictsTable();
+      loadDashboardAnalytics();
+      loadDistrictListForAdminsSelect();
     } else {
-      pendingTbody.innerHTML = pendingData.map(u => `
-        <tr>
-          <td>${escapeHtml(u.name)}</td>
-          <td>${escapeHtml(u.pno)}</td>
-          <td>${escapeHtml(u.rank)}</td>
-          <td>${escapeHtml(u.postingUnit)}</td>
-          <td>
-            <button class="btn btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="modifyStatus(${u.id}, 'active')">Approve</button>
-          </td>
-        </tr>
-      `).join('');
+      throw new Error(data.error);
     }
-
-    // 2. Load active users
-    const activeRes = await fetch(`${BACKEND_BASE_URL}/api/users/list?status=active`, { headers: getAuthHeaders() });
-    const activeData = await activeRes.json();
-
-    const activeTbody = document.getElementById('activeUsersTableBody');
-    if (activeData.length === 0) {
-      activeTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No active mess members.</td></tr>`;
-    } else {
-      activeTbody.innerHTML = activeData.map(u => `
-        <tr>
-          <td>${escapeHtml(u.name)}</td>
-          <td>${escapeHtml(u.pno)}</td>
-          <td>${escapeHtml(u.rank)}</td>
-          <td>${escapeHtml(u.postingUnit)}</td>
-          <td><span class="badge badge-success">${u.status}</span></td>
-          <td>
-            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="modifyStatus(${u.id}, 'deactivated')">Deactivate</button>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-  } catch (err) {
-    console.error('Failed to load personnel tables:', err);
-  }
-}
-
-async function modifyStatus(userId, status) {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/users/status`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ userId, status })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-
-    showNotification(`Status updated successfully!`, 'success');
-    await loadAdminStats();
-    await loadPersonnelLists();
   } catch (err) {
     showNotification(err.message, 'error');
   }
 }
 
-async function loadMealRates() {
-  const form = document.getElementById('updateRatesForm');
-  if (!form) return;
+// Load district options inside admin select dropdowns
+async function loadDistrictListForAdminsSelect() {
+  const select = document.getElementById('adminDistrictId');
+  const selectEditUser = document.getElementById('editDistrictId');
 
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/districts`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      select.innerHTML = '<option value="" disabled selected>Select District</option>';
+      selectEditUser.innerHTML = '<option value="">No District (Super Admin)</option>';
+      data.data.forEach(d => {
+        if (d.status === 'active') {
+          select.innerHTML += `<option value="${d.id}">${d.districtName}</option>`;
+        }
+        selectEditUser.innerHTML += `<option value="${d.id}">${d.districtName}</option>`;
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load admin select options:', err);
+  }
+}
+
+// District Admins List
+async function loadAdminsTable() {
+  const tbody = document.getElementById('adminsTableBody');
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      const admins = data.data.filter(u => u.role === 'district_admin');
+      if (admins.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No district admins created yet.</td></tr>';
+        return;
+      }
+      admins.forEach(a => {
+        const badgeClass = a.isActive ? 'success' : 'danger';
+        tbody.innerHTML += `
+          <tr>
+            <td>${a.id}</td>
+            <td><strong>${a.fullName}</strong></td>
+            <td>${a.email}</td>
+            <td>${a.districtName || '<span style="color: var(--warning);">Not Assigned</span>'}</td>
+            <td><span class="badge badge-${badgeClass}">${a.isActive ? 'Active' : 'Deactivated'}</span></td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="editUser(${a.id}, '${a.fullName}', '${a.email}', '${a.districtId || ''}', ${a.isActive})">Edit / Reassign</button>
+              <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteUser(${a.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading admins list.</td></tr>';
+  }
+}
+
+function openAdminModal() {
+  document.getElementById('adminForm').reset();
+  document.getElementById('adminOverlay').classList.add('active');
+}
+
+function closeAdminModal() {
+  document.getElementById('adminOverlay').classList.remove('active');
+}
+
+// Registered Users Management
+async function loadUsersTable(searchQuery = '') {
+  const tbody = document.getElementById('usersTableBody');
+  const url = searchQuery
+    ? `${BACKEND_BASE_URL}/api/users/search?q=${encodeURIComponent(searchQuery)}`
+    : `${BACKEND_BASE_URL}/api/users`;
+
+  try {
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+
+      const simpleUsers = data.data.filter(u => u.role !== 'super_admin');
+
+      if (simpleUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No registered users found.</td></tr>';
+        return;
+      }
+
+      simpleUsers.forEach(u => {
+        const badgeClass = u.isActive ? 'success' : 'danger';
+        tbody.innerHTML += `
+          <tr>
+            <td>${u.id}</td>
+            <td><strong>${u.fullName}</strong></td>
+            <td>${u.email}</td>
+            <td><code style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.5rem; border-radius: 4px;">${u.role}</code></td>
+            <td>${u.districtName || 'None'}</td>
+            <td>${u.isVerified ? '✅ Verified' : '❌ Pending'}</td>
+            <td><span class="badge badge-${badgeClass}">${u.isActive ? 'Active' : 'Deactivated'}</span></td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="editUser(${u.id}, '${u.fullName}', '${u.email}', '${u.districtId || ''}', ${u.isActive})">Edit</button>
+              <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteUser(${u.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--error);">Error loading users database.</td></tr>';
+  }
+}
+
+function editUser(id, fullName, email, districtId, isActive) {
+  document.getElementById('editUserId').value = id;
+  document.getElementById('editFullName').value = fullName;
+  document.getElementById('editEmail').value = email;
+  document.getElementById('editDistrictId').value = districtId;
+  document.getElementById('selectUserStatus').value = isActive ? 'active' : 'inactive';
+  document.getElementById('userEditOverlay').classList.add('active');
+}
+
+function closeUserEditModal() {
+  document.getElementById('userEditOverlay').classList.remove('active');
+}
+
+async function deleteUser(id) {
+  if (!confirm('Are you sure you want to delete this user account?')) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users/${id}`, {
+      method: 'DELETE',
       headers: getAuthHeaders()
     });
+    if (response.ok) {
+      showNotification('User deleted successfully.', 'success');
+      loadUsersTable();
+      loadAdminsTable();
+      loadDistrictsTable();
+    } else {
+      const d = await response.json();
+      throw new Error(d.error);
+    }
+  } catch (err) {
+    showNotification(err.message, 'error');
+  }
+}
+
+// Load global whitelist configurations
+async function loadSettings() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/settings`, { headers: getAuthHeaders() });
+    const resData = await response.json();
+    if (response.ok) {
+      const config = resData.data.configMap;
+      document.getElementById('settingWebsiteName').value = config.website_name || '';
+      document.getElementById('settingOtpExpiry').value = config.otp_expiry_minutes || '';
+      document.getElementById('settingEmailSender').value = config.email_sender || '';
+      document.getElementById('settingAllowedEmails').value = config.allowed_emails || '';
+    }
+  } catch (err) {
+    console.error('Failed to load settings:', err);
+  }
+}
+
+// Audit Logs loader
+async function loadAuditLogs() {
+  const tbody = document.getElementById('logsTableBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/reports?type=activity_logs`, { headers: getAuthHeaders() });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
+    if (response.ok) {
+      tbody.innerHTML = '';
+      if (data.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No logs registered in system.</td></tr>';
+        return;
+      }
+      data.data.forEach(log => {
+        const timeStr = new Date(log.createdAt).toLocaleString();
+        tbody.innerHTML += `
+          <tr>
+            <td>${log.id}</td>
+            <td style="color: var(--text-secondary); font-size: 0.85rem;">${timeStr}</td>
+            <td><strong>${log.userName || 'SYSTEM'}</strong> (${log.userEmail || 'system'})</td>
+            <td><span class="badge badge-info">${log.action}</span></td>
+            <td style="font-size: 0.9rem; color: var(--text-secondary);">${log.details || ''}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Error loading system logs.</td></tr>';
+  }
+}
 
-    document.getElementById('rateBreakfast').value = data.breakfast;
-    document.getElementById('rateLunch').value = data.lunch;
-    document.getElementById('rateDinner').value = data.dinner;
 
-    // Attach edit rates submit
-    form.addEventListener('submit', async (e) => {
+/* ==========================================================================
+   4. District Admin Dashboard (district-dashboard.html)
+   ========================================================================== */
+
+function initDistrictDashboard() {
+  const user = JSON.parse(localStorage.getItem('user'));
+  document.getElementById('userGreeting').innerText = `Welcome, Admin | ${user.fullName}`;
+
+  // Initialize Flatpickr date pickers
+  if (typeof flatpickr !== 'undefined') {
+    window.reportStartPicker = flatpickr("#reportStartDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      placeholder: "Select Start Date"
+    });
+    window.reportEndPicker = flatpickr("#reportEndDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      placeholder: "Select End Date"
+    });
+    window.summaryDatePicker = flatpickr("#attendanceSummaryDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      defaultDate: "today",
+      maxDate: "today",
+      onChange: function(selectedDates, dateStr) {
+        if (dateStr) {
+          loadAttendanceSummary(dateStr);
+        }
+      }
+    });
+    window.adminAttendancePicker = flatpickr("#adminAttendanceDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      maxDate: "today",
+      onChange: function(selectedDates, dateStr) {
+        const userId = document.getElementById('attendanceUserId').value;
+        if (userId && dateStr) {
+          fetchAndSetAdminAttendance(userId, dateStr);
+        }
+      }
+    });
+  }
+
+  loadDistrictDashboardStats();
+  loadDistrictUsersTable();
+  loadDistrictNoticesTable();
+
+  // Search member input
+  document.getElementById('btnSearchUser').addEventListener('click', () => {
+    const q = document.getElementById('searchUserInput').value.trim();
+    loadDistrictUsersTable(q);
+  });
+
+  // Create member account
+  const createUserForm = document.getElementById('createUserForm');
+  createUserForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fullName = document.getElementById('memberFullName').value.trim();
+    const email = document.getElementById('memberEmail').value.trim();
+    const password = document.getElementById('memberPassword').value.trim();
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/users`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ fullName, email, password, role: 'user' })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to add member.');
+
+      showNotification('Mess member registered successfully.', 'success');
+      closeCreateUserModal();
+      loadDistrictUsersTable();
+      loadDistrictDashboardStats();
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Edit user form
+  const editUserForm = document.getElementById('editUserForm');
+  editUserForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editUserId').value;
+    const fullName = document.getElementById('editFullName').value.trim();
+    const email = document.getElementById('editEmail').value.trim();
+    const status = document.getElementById('selectUserStatus').value;
+    const isActive = status === 'active';
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/users/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ fullName, email, isActive })
+      });
+      if (response.ok) {
+        showNotification('Member settings updated.', 'success');
+        closeEditUserModal();
+        loadDistrictUsersTable();
+        loadDistrictDashboardStats();
+      } else {
+        const d = await response.json();
+        throw new Error(d.error);
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Post Notice Board Notice
+  const noticeForm = document.getElementById('noticeForm');
+  noticeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('inputNoticeTitle').value.trim();
+    const content = document.getElementById('inputNoticeContent').value.trim();
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/notifications`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ title, content })
+      });
+      if (response.ok) {
+        showNotification('Notice announcement published.', 'success');
+        closeNoticeModal();
+        loadDistrictNoticesTable();
+      } else {
+        const d = await response.json();
+        throw new Error(d.error);
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Reports generator binding
+  let generatedReportData = [];
+  const reportForm = document.getElementById('reportForm');
+  reportForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const type = document.getElementById('selectReportType').value;
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+
+    let url = `${BACKEND_BASE_URL}/api/reports?type=${type}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+
+    try {
+      const response = await fetch(url, { headers: getAuthHeaders() });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      generatedReportData = data.data;
+      document.getElementById('reportSummaryText').innerText = `Successfully compiled ${generatedReportData.length} records. Ready to download as CSV spreadsheet.`;
+      document.getElementById('reportSummaryPanel').style.display = 'block';
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  document.getElementById('btnDownloadCsv').addEventListener('click', () => {
+    if (generatedReportData.length === 0) return;
+    const type = document.getElementById('selectReportType').value;
+    downloadCSV(generatedReportData, `${type}_report_${new Date().toISOString().split('T')[0]}.csv`, type);
+  });
+
+  // Password update form
+  const passForm = document.getElementById('passwordChangeForm');
+  passForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const currentPassword = document.getElementById('inputCurrentPassword').value;
+    const newPassword = document.getElementById('inputNewPassword').value;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/profile/change-password`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showNotification('Password updated successfully.', 'success');
+        passForm.reset();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Load and initialize Menu Management
+  loadAdminMenuTable();
+
+  // Load and initialize Attendance Summary
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (window.summaryDatePicker) {
+    window.summaryDatePicker.setDate(todayStr);
+  } else {
+    document.getElementById('attendanceSummaryDate').value = todayStr;
+  }
+  loadAttendanceSummary(todayStr);
+
+  // Load and initialize Rates & Bills
+  loadMealRates();
+  loadBillsTable();
+
+  // Admin Attendance Modal listeners
+  document.getElementById('adminAttendanceDate').addEventListener('change', (e) => {
+    const userId = document.getElementById('attendanceUserId').value;
+    const selectedDate = e.target.value;
+    if (userId && selectedDate) {
+      fetchAndSetAdminAttendance(userId, selectedDate);
+    }
+  });
+
+  // Mutual exclusion logic for Morning checkboxes
+  const morningCheckboxes = [
+    document.getElementById('adminAttendMorningNormal'),
+    document.getElementById('adminAttendMorningHalfSpecial'),
+    document.getElementById('adminAttendMorningFullSpecial')
+  ];
+  morningCheckboxes.forEach(chk => {
+    if (chk) {
+      chk.addEventListener('change', () => {
+        if (chk.checked) {
+          morningCheckboxes.forEach(other => {
+            if (other !== chk) other.checked = false;
+          });
+        }
+      });
+    }
+  });
+
+  // Mutual exclusion logic for Evening checkboxes
+  const eveningCheckboxes = [
+    document.getElementById('adminAttendEveningNormal'),
+    document.getElementById('adminAttendEveningHalfSpecial'),
+    document.getElementById('adminAttendEveningFullSpecial')
+  ];
+  eveningCheckboxes.forEach(chk => {
+    if (chk) {
+      chk.addEventListener('change', () => {
+        if (chk.checked) {
+          eveningCheckboxes.forEach(other => {
+            if (other !== chk) other.checked = false;
+          });
+        }
+      });
+    }
+  });
+
+  document.getElementById('adminAttendanceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const userId = document.getElementById('attendanceUserId').value;
+    const date = document.getElementById('adminAttendanceDate').value;
+    const morningNormal = document.getElementById('adminAttendMorningNormal').checked;
+    const morningHalfSpecial = document.getElementById('adminAttendMorningHalfSpecial').checked;
+    const morningFullSpecial = document.getElementById('adminAttendMorningFullSpecial').checked;
+    const eveningNormal = document.getElementById('adminAttendEveningNormal').checked;
+    const eveningHalfSpecial = document.getElementById('adminAttendEveningHalfSpecial').checked;
+    const eveningFullSpecial = document.getElementById('adminAttendEveningFullSpecial').checked;
+
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/attendance`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId, date, morningNormal, morningHalfSpecial, morningFullSpecial, eveningNormal, eveningHalfSpecial, eveningFullSpecial })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to submit attendance.');
+      showNotification('Meal attendance updated successfully!', 'success');
+      closeMarkAttendanceModal();
+
+      const summaryDate = document.getElementById('attendanceSummaryDate').value;
+      if (summaryDate) {
+        loadAttendanceSummary(summaryDate);
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Update rates submit handler
+  document.getElementById('ratesForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const normalDiet = parseFloat(document.getElementById('rateNormalDiet').value);
+    const halfSpecialDiet = parseFloat(document.getElementById('rateHalfSpecialDiet').value);
+    const fullSpecialDiet = parseFloat(document.getElementById('rateFullSpecialDiet').value);
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ normalDiet, halfSpecialDiet, fullSpecialDiet })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update rates.');
+      showNotification('Meal cost rates updated successfully.', 'success');
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
+
+  // Update cutoff settings submit handler
+  const cutoffForm = document.getElementById('cutoffSettingsForm');
+  if (cutoffForm) {
+    cutoffForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const breakfast = document.getElementById('rateBreakfast').value;
-      const lunch = document.getElementById('rateLunch').value;
-      const dinner = document.getElementById('rateDinner').value;
-
+      const morningCutoff = document.getElementById('rateMorningCutoff').value;
+      const eveningCutoff = document.getElementById('rateEveningCutoff').value;
+      const user = JSON.parse(localStorage.getItem('user'));
+      
       try {
-        const updateRes = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, {
-          method: 'POST',
+        const response = await fetch(`${BACKEND_BASE_URL}/api/districts/${user.districtId}/cutoff`, {
+          method: 'PUT',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ breakfast, lunch, dinner })
+          body: JSON.stringify({ morningCutoff, eveningCutoff })
         });
-        const updateData = await updateRes.json();
-        if (!updateRes.ok) throw new Error(updateData.error);
-
-        showNotification('Meal pricing updated successfully!', 'success');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to update cutoff times.');
+        showNotification('District Nil Diet cutoff settings updated successfully.', 'success');
       } catch (err) {
         showNotification(err.message, 'error');
       }
     });
-
-  } catch (err) {
-    console.error('Failed to load meal rates:', err);
   }
-}
 
-function initBillingManagementSection() {
-  const form = document.getElementById('generateBillsForm');
-  if (!form) return;
-
-  // Set default values for billing generator
-  const today = new Date();
-  document.getElementById('selectBillMonth').value = today.getMonth() + 1;
-  document.getElementById('inputBillYear').value = today.getFullYear();
-
-  // Attach calculate submit
-  form.addEventListener('submit', async (e) => {
+  // Generate monthly bills submit handler
+  document.getElementById('generateBillsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const month = document.getElementById('selectBillMonth').value;
-    const year = document.getElementById('inputBillYear').value;
-
+    const month = parseInt(document.getElementById('billMonth').value);
+    const year = parseInt(document.getElementById('billYear').value);
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/bills/generate`, {
         method: 'POST',
@@ -825,25 +1304,46 @@ function initBillingManagementSection() {
         body: JSON.stringify({ month, year })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      showNotification(data.message, 'success');
-      loadAdminBillsLedger(); // Refresh list
+      if (!response.ok) throw new Error(data.error || 'Failed to generate bills.');
+      showNotification(data.message || 'Bills generated successfully.', 'success');
+      loadBillsTable();
     } catch (err) {
       showNotification(err.message, 'error');
     }
   });
 
-  // Load bills list
-  loadAdminBillsLedger();
+  // Edit menu form submit handler
+  document.getElementById('editMenuForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('editMenuDayId').value);
+    const morningNormal = document.getElementById('editMenuMorningNormal').value.trim();
+    const morningHalfSpecial = document.getElementById('editMenuMorningHalfSpecial').value.trim();
+    const morningFullSpecial = document.getElementById('editMenuMorningFullSpecial').value.trim();
+    const eveningNormal = document.getElementById('editMenuEveningNormal').value.trim();
+    const eveningHalfSpecial = document.getElementById('editMenuEveningHalfSpecial').value.trim();
+    const eveningFullSpecial = document.getElementById('editMenuEveningFullSpecial').value.trim();
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/menu/update`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id, morningNormal, morningHalfSpecial, morningFullSpecial, eveningNormal, eveningHalfSpecial, eveningFullSpecial })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update menu.');
+      showNotification('Menu updated successfully.', 'success');
+      closeEditMenuModal();
+      loadAdminMenuTable();
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
+  });
 
-  // Attach Payment modal confirmation handler
-  const payForm = document.getElementById('paymentForm');
-  payForm.addEventListener('submit', async (e) => {
-    const billId = document.getElementById('modalBillId').value;
-    const paymentMode = document.getElementById('selectPayMode').value;
-    const transactionId = document.getElementById('inputTxnId').value.trim();
-
+  // Record payment form submit handler
+  document.getElementById('recordPaymentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const billId = parseInt(document.getElementById('paymentBillId').value);
+    const paymentMode = document.getElementById('paymentMode').value;
+    const transactionId = document.getElementById('paymentTransactionId').value.trim();
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/bills/pay`, {
         method: 'POST',
@@ -851,242 +1351,1177 @@ function initBillingManagementSection() {
         body: JSON.stringify({ billId, paymentMode, transactionId })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      showNotification('Bill payment registered successfully!', 'success');
-      loadAdminBillsLedger(); // reload list
+      if (!response.ok) throw new Error(data.error || 'Failed to record payment.');
+      showNotification('Payment recorded successfully.', 'success');
+      closeRecordPaymentModal();
+      loadBillsTable();
     } catch (err) {
       showNotification(err.message, 'error');
     }
   });
+
+  // Load Nil Diet Requests
+  loadNilDietRequestsAdmin();
 }
 
-async function loadAdminBillsLedger() {
+// District dashboard stats loaders
+async function loadDistrictDashboardStats() {
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, {
-      headers: getAuthHeaders()
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
+    const response = await fetch(`${BACKEND_BASE_URL}/api/dashboard`, { headers: getAuthHeaders() });
+    const resData = await response.json();
+    if (response.ok) {
+      const data = resData.data;
 
-    const tbody = document.getElementById('adminBillsTableBody');
-    if (!tbody) return;
+      document.getElementById('adminDistrictHeader').innerText = `👮 ${data.district.districtName} DISTRICT MESS`;
+      document.getElementById('statDistrictName').innerText = data.district.districtName;
+      document.getElementById('statDistrictCode').innerText = `Code: ${data.district.districtCode}`;
+      document.getElementById('statTotalUsers').innerText = data.totalUsers;
+      document.getElementById('statActiveUsers').innerText = data.activeUsers;
+      document.getElementById('statInactiveUsers').innerText = data.inactiveUsers;
 
-    if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No bills generated.</td></tr>`;
-      return;
+      if (document.getElementById('rateMorningCutoff')) {
+        document.getElementById('rateMorningCutoff').value = data.district.morningCutoff || '20:00';
+      }
+      if (document.getElementById('rateEveningCutoff')) {
+        document.getElementById('rateEveningCutoff').value = data.district.eveningCutoff || '12:00';
+      }
+
+      // Compile recent registrations
+      const regsTbody = document.getElementById('recentRegsTableBody');
+      regsTbody.innerHTML = '';
+      if (data.recentRegistrations.length === 0) {
+        regsTbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">No recent registrations.</td></tr>';
+      } else {
+        data.recentRegistrations.forEach(r => {
+          regsTbody.innerHTML += `
+            <tr>
+              <td><strong>${r.fullName}</strong></td>
+              <td>${r.email}</td>
+              <td><span class="badge badge-${r.isActive ? 'success' : 'danger'}">${r.isActive ? 'active' : 'inactive'}</span></td>
+            </tr>
+          `;
+        });
+      }
+
+
     }
-
-    const months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    
-    tbody.innerHTML = data.map(bill => {
-      const statusBadge = bill.status === 'paid' 
-        ? '<span class="badge badge-success">Paid</span>' 
-        : '<span class="badge badge-warning">Unpaid</span>';
-
-      const actionButton = bill.status === 'unpaid'
-        ? `<button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="openPaymentModal(${bill.id})">Mark Paid</button>`
-        : `<span style="color: var(--text-secondary); font-size: 0.75rem;">N/A</span>`;
-      
-      return `
-        <tr>
-          <td>${escapeHtml(bill.userName)}</td>
-          <td>${escapeHtml(bill.pno)}</td>
-          <td>${months[bill.month]} ${bill.year}</td>
-          <td>${bill.totalMeals}</td>
-          <td>₹${bill.totalAmount}</td>
-          <td>${statusBadge}</td>
-          <td>${actionButton}</td>
-        </tr>
-      `;
-    }).join('');
-
   } catch (err) {
-    console.error('Failed to load bills ledger:', err);
+    console.error('Failed to load district summary:', err);
   }
 }
 
-function openPaymentModal(billId) {
-  document.getElementById('modalBillId').value = billId;
-  document.getElementById('inputTxnId').value = '';
-  document.getElementById('paymentDialog').showModal();
+// Scoped User CRUD table
+async function loadDistrictUsersTable(searchTerm = '') {
+  const tbody = document.getElementById('usersTableBody');
+  const url = searchTerm
+    ? `${BACKEND_BASE_URL}/api/users/search?q=${encodeURIComponent(searchTerm)}`
+    : `${BACKEND_BASE_URL}/api/users`;
+
+  try {
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+
+      const simpleUsers = data.data.filter(u => u.role === 'user');
+
+      if (simpleUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No district members registered.</td></tr>';
+        return;
+      }
+
+      simpleUsers.forEach(u => {
+        const badgeClass = u.isActive ? 'success' : 'danger';
+        const dateStr = new Date(u.createdAt).toLocaleDateString();
+        tbody.innerHTML += `
+          <tr>
+            <td>${u.id}</td>
+            <td><strong>${u.fullName}</strong></td>
+            <td>${u.email}</td>
+            <td>${u.isVerified ? '✅ Verified' : '❌ Pending'}</td>
+            <td><span class="badge badge-${badgeClass}">${u.isActive ? 'Permitted' : 'Suspended'}</span></td>
+            <td style="color: var(--text-secondary); font-size: 0.85rem;">${dateStr}</td>
+            <td>
+              <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="openMarkAttendanceModal(${u.id}, '${u.fullName.replace(/'/g, "\\'")}')">Mark Attendance</button>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="openEditUserModal(${u.id}, '${u.fullName.replace(/'/g, "\\'")}', '${u.email}', ${u.isActive})">Edit</button>
+              <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteDistrictUser(${u.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--error);">Error loading members database.</td></tr>';
+  }
 }
 
-function initAnnouncementsForm() {
-  const form = document.getElementById('createNoticeForm');
-  if (!form) return;
+// User CRUD overlays
+function openCreateUserModal() {
+  document.getElementById('createUserForm').reset();
+  document.getElementById('createUserOverlay').classList.add('active');
+}
 
-  form.addEventListener('submit', async (e) => {
+function closeCreateUserModal() {
+  document.getElementById('createUserOverlay').classList.remove('active');
+}
+
+function openEditUserModal(id, name, email, isActive) {
+  document.getElementById('editUserId').value = id;
+  document.getElementById('editFullName').value = name;
+  document.getElementById('editEmail').value = email;
+  document.getElementById('selectUserStatus').value = isActive ? 'active' : 'inactive';
+  document.getElementById('editUserOverlay').classList.add('active');
+}
+
+function closeEditUserModal() {
+  document.getElementById('editUserOverlay').classList.remove('active');
+}
+
+function openMarkAttendanceModal(userId, fullName) {
+  document.getElementById('attendanceUserId').value = userId;
+  document.getElementById('attendanceModalTitle').innerText = `Mark Attendance - ${fullName}`;
+
+  // Default to today
+  const todayDateObj = new Date();
+  const today = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, '0')}-${String(todayDateObj.getDate()).padStart(2, '0')}`;
+  const dateInput = document.getElementById('adminAttendanceDate');
+  if (window.adminAttendancePicker) {
+    window.adminAttendancePicker.setDate(today);
+  } else {
+    dateInput.value = today;
+  }
+
+  fetchAndSetAdminAttendance(userId, today);
+
+  document.getElementById('markAttendanceOverlay').classList.add('active');
+}
+
+function closeMarkAttendanceModal() {
+  document.getElementById('markAttendanceOverlay').classList.remove('active');
+}
+
+async function fetchAndSetAdminAttendance(userId, date) {
+  const chkMorningNormal = document.getElementById('adminAttendMorningNormal');
+  const chkMorningHalfSpecial = document.getElementById('adminAttendMorningHalfSpecial');
+  const chkMorningFullSpecial = document.getElementById('adminAttendMorningFullSpecial');
+  const chkEveningNormal = document.getElementById('adminAttendEveningNormal');
+  const chkEveningHalfSpecial = document.getElementById('adminAttendEveningHalfSpecial');
+  const chkEveningFullSpecial = document.getElementById('adminAttendEveningFullSpecial');
+  const submitBtn = document.querySelector('#adminAttendanceForm button[type="submit"]');
+  const warningDiv = document.getElementById('modalNilDietWarning');
+
+  // Fetch Nil Diet requests to see if this user is excluded on the date
+  let isMorningNil = false;
+  let isEveningNil = false;
+  try {
+    const nilResponse = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, { headers: getAuthHeaders() });
+    if (nilResponse.ok) {
+      const nilRequests = await nilResponse.json();
+      const targetUserId = parseInt(userId);
+      const matched = nilRequests.find(r => 
+        r.userId === targetUserId && 
+        r.status === 'approved' && 
+        date >= r.fromDate.split('T')[0] && 
+        date <= r.toDate.split('T')[0]
+      );
+      if (matched) {
+        isMorningNil = !!matched.morningDiet;
+        isEveningNil = !!matched.eveningDiet;
+      }
+    }
+  } catch (err) {
+    console.error('Error checking Nil request state:', err);
+  }
+
+  if (warningDiv) {
+    if (isMorningNil && isEveningNil) {
+      warningDiv.style.display = 'block';
+      warningDiv.innerHTML = `<strong>🛑 Notice:</strong> This member has an approved Nil Diet request (both sessions) active for this date. Modifying attendance is locked.`;
+    } else if (isMorningNil) {
+      warningDiv.style.display = 'block';
+      warningDiv.innerHTML = `<strong>🛑 Notice:</strong> This member has an approved Nil Diet request active for the Morning session. Morning attendance is locked.`;
+    } else if (isEveningNil) {
+      warningDiv.style.display = 'block';
+      warningDiv.innerHTML = `<strong>🛑 Notice:</strong> This member has an approved Nil Diet request active for the Evening session. Evening attendance is locked.`;
+    } else {
+      warningDiv.style.display = 'none';
+    }
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = isMorningNil && isEveningNil;
+  }
+
+  // Clear or disable checkbox elements based on session-specific Nil exclusion
+  [chkMorningNormal, chkMorningHalfSpecial, chkMorningFullSpecial].forEach(chk => {
+    if (chk) {
+      chk.disabled = isMorningNil;
+      chk.checked = false;
+    }
+  });
+  [chkEveningNormal, chkEveningHalfSpecial, chkEveningFullSpecial].forEach(chk => {
+    if (chk) {
+      chk.disabled = isEveningNil;
+      chk.checked = false;
+    }
+  });
+
+  if (isMorningNil && isEveningNil) return;
+
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/member/${userId}`, { headers: getAuthHeaders() });
+    if (response.ok) {
+      const history = await response.json();
+      const record = history.find(r => r.date.split('T')[0] === date);
+      if (record) {
+        if (chkMorningNormal && !isMorningNil) chkMorningNormal.checked = !!record.morningNormal;
+        if (chkMorningHalfSpecial && !isMorningNil) chkMorningHalfSpecial.checked = !!record.morningHalfSpecial;
+        if (chkMorningFullSpecial && !isMorningNil) chkMorningFullSpecial.checked = !!record.morningFullSpecial;
+        if (chkEveningNormal && !isEveningNil) chkEveningNormal.checked = !!record.eveningNormal;
+        if (chkEveningHalfSpecial && !isEveningNil) chkEveningHalfSpecial.checked = !!record.eveningHalfSpecial;
+        if (chkEveningFullSpecial && !isEveningNil) chkEveningFullSpecial.checked = !!record.eveningFullSpecial;
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching member attendance details:', err);
+  }
+}
+
+async function deleteDistrictUser(id) {
+  if (!confirm('Are you sure you want to delete this mess member account?')) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      showNotification('Member deleted successfully.', 'success');
+      loadDistrictUsersTable();
+      loadDistrictDashboardStats();
+    } else {
+      const d = await response.json();
+      throw new Error(d.error);
+    }
+  } catch (err) {
+    showNotification(err.message, 'error');
+  }
+}
+
+// District notices loaders
+async function loadDistrictNoticesTable() {
+  const tbody = document.getElementById('noticesTableBody');
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/notifications`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      if (data.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No notice announcements published.</td></tr>';
+        return;
+      }
+      data.data.forEach(n => {
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${n.title}</strong></td>
+            <td style="font-size: 0.9rem; color: var(--text-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${n.content}</td>
+            <td>${n.postedByName}</td>
+            <td style="font-size: 0.85rem; color: var(--text-secondary);">${new Date(n.createdAt).toLocaleDateString()}</td>
+            <td>
+              <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteNotice(${n.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Error loading announcements.</td></tr>';
+  }
+}
+
+function openNoticeModal() {
+  document.getElementById('noticeForm').reset();
+  document.getElementById('noticeOverlay').classList.add('active');
+}
+
+function closeNoticeModal() {
+  document.getElementById('noticeOverlay').classList.remove('active');
+}
+
+async function deleteNotice(id) {
+  if (!confirm('Are you sure you want to remove this announcement notice?')) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/notifications/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      showNotification('Notice deleted successfully.', 'success');
+      loadDistrictNoticesTable();
+    } else {
+      const d = await response.json();
+      throw new Error(d.error);
+    }
+  } catch (err) {
+    showNotification(err.message, 'error');
+  }
+}
+
+
+/* ==========================================================================
+   5. Personnel/Simple User Dashboard (personnel-dashboard.html)
+   ========================================================================== */
+
+function initPersonnelDashboard() {
+  const user = JSON.parse(localStorage.getItem('user'));
+  document.getElementById('userGreeting').innerText = `Welcome, Member | ${user.fullName}`;
+
+  // Initialize Flatpickr date pickers for Nil Diet range
+  if (typeof flatpickr !== 'undefined') {
+    flatpickr("#nilFromDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      placeholder: "Select Start Date"
+    });
+    flatpickr("#nilToDate", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d-m-Y",
+      placeholder: "Select End Date"
+    });
+  }
+
+  // Fill Edit Profile form with defaults
+  document.getElementById('inputEmailStatic').value = user.email;
+  document.getElementById('inputFullName').value = user.fullName;
+
+  // Load district details & announcements notice boards
+  loadMemberDistrictDetailsAndNotices();
+
+  // Load Weekly Menu, Attendance, and Bills
+  loadMemberMenuTable();
+  loadMemberAttendanceHistory();
+  loadMemberBillsTable();
+
+  const btnFilter = document.getElementById('btnFilterMemberHistory');
+  if (btnFilter) {
+    btnFilter.addEventListener('click', () => {
+      loadMemberAttendanceHistory();
+    });
+  }
+
+  const selectMonth = document.getElementById('memberHistoryMonth');
+  if (selectMonth) {
+    selectMonth.addEventListener('change', () => {
+      loadMemberAttendanceHistory();
+    });
+  }
+
+  const inputYear = document.getElementById('memberHistoryYear');
+  if (inputYear) {
+    inputYear.addEventListener('input', () => {
+      loadMemberAttendanceHistory();
+    });
+  }
+
+  // Profile update submit
+  const profileForm = document.getElementById('profileUpdateForm');
+  profileForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const title = document.getElementById('inputNoticeTitle').value.trim();
-    const content = document.getElementById('inputNoticeContent').value.trim();
+    const fullName = document.getElementById('inputFullName').value.trim();
 
     try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/notices`, {
-        method: 'POST',
+      const response = await fetch(`${BACKEND_BASE_URL}/api/profile`, {
+        method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ title, content })
+        body: JSON.stringify({ fullName })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-
-      showNotification('Notice announcement published successfully!', 'success');
-      form.reset();
-      loadNoticesFeed('adminNoticesFeed'); // Refresh feed list
+      if (response.ok) {
+        showNotification('Profile updated successfully.', 'success');
+        user.fullName = fullName;
+        localStorage.setItem('user', JSON.stringify(user));
+        document.getElementById('userGreeting').innerText = `Welcome, Member | ${fullName}`;
+      } else {
+        throw new Error(data.error);
+      }
     } catch (err) {
       showNotification(err.message, 'error');
     }
   });
-}
 
-function initExportsSection() {
-  const form = document.getElementById('exportReportForm');
-  if (!form) return;
-
-  // Defaults
-  const today = new Date();
-  document.getElementById('selectExportMonth').value = today.getMonth() + 1;
-  document.getElementById('inputExportYear').value = today.getFullYear();
-
-  form.addEventListener('submit', (e) => {
+  // Password update submit
+  const passForm = document.getElementById('passwordChangeForm');
+  passForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const month = document.getElementById('selectExportMonth').value;
-    const year = document.getElementById('inputExportYear').value;
-    const token = localStorage.getItem('token');
+    const currentPassword = document.getElementById('inputCurrentPassword').value;
+    const newPassword = document.getElementById('inputNewPassword').value;
 
-    // Trigger standard browser download by navigating to custom CSV endpoint containing query auth token
-    const exportUrl = `${BACKEND_BASE_URL}/api/users/export-attendance?month=${month}&year=${year}&token=${token}`;
-    window.location.href = exportUrl;
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/profile/change-password`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showNotification('Password updated successfully.', 'success');
+        passForm.reset();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      showNotification(err.message, 'error');
+    }
   });
 
-  const btnPdf = document.getElementById('btnExportAttendancePdf');
-  if (btnPdf) {
-    btnPdf.addEventListener('click', async () => {
-      const month = document.getElementById('selectExportMonth').value;
-      const year = document.getElementById('inputExportYear').value;
-      
-      btnPdf.disabled = true;
-      const originalText = btnPdf.innerText;
-      btnPdf.innerText = 'Generating PDF...';
+  // Nil diet request submit
+  const nilDietForm = document.getElementById('nilDietForm');
+  if (nilDietForm) {
+    nilDietForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fromDate = document.getElementById('nilFromDate').value;
+      const toDate = document.getElementById('nilToDate').value;
+      const morningDiet = document.getElementById('nilMorningDiet').checked;
+      const eveningDiet = document.getElementById('nilEveningDiet').checked;
+
       try {
-        await downloadAttendancePDF(month, year);
-      } finally {
-        btnPdf.disabled = false;
-        btnPdf.innerText = originalText;
+        const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ fromDate, toDate, morningDiet, eveningDiet })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to submit nil diet request.');
+
+        showNotification('Nil diet request submitted successfully.', 'success');
+        nilDietForm.reset();
+        loadMemberNilDietRequests();
+      } catch (err) {
+        showNotification(err.message, 'error');
       }
     });
+  }
+
+  // Load Member Nil Diet requests history
+  loadMemberNilDietRequests();
+}
+
+function getEarliestAllowedNilDietDate() {
+  return new Date();
+}
+
+// Scoped loader for simple user profile info
+async function loadMemberDistrictDetailsAndNotices() {
+  try {
+    // 1. Fetch Dashboard summary containing user and district info
+    const response = await fetch(`${BACKEND_BASE_URL}/api/dashboard`, { headers: getAuthHeaders() });
+    const resData = await response.json();
+    if (response.ok) {
+      const dist = resData.data.district;
+      if (dist) {
+        document.getElementById('distNameText').innerText = dist.districtName;
+        document.getElementById('distCodeText').innerText = dist.districtCode;
+
+        const badge = document.getElementById('distStatusBadge');
+        badge.className = `badge badge-${dist.status === 'active' ? 'success' : 'danger'}`;
+        badge.innerText = dist.status;
+
+        document.getElementById('distAdminName').innerText = dist.adminName || 'No Admin Assigned';
+        document.getElementById('distAdminEmail').innerText = dist.adminEmail || '';
+
+        // Populate cutoff labels in the Nil Diet request corner
+        if (dist.morningCutoff) {
+          const morningTime = dist.morningCutoff;
+          const [h, m] = morningTime.split(':').map(Number);
+          const morningDisplay = h >= 12 ? `${h === 12 ? 12 : h - 12}:${String(m).padStart(2, '0')} PM` : `${h === 0 ? 12 : h}:${String(m).padStart(2, '0')} AM`;
+          const cutoffM = document.getElementById('cutoffNoticeMorning');
+          if (cutoffM) cutoffM.innerText = morningDisplay;
+        }
+        if (dist.eveningCutoff) {
+          const eveningTime = dist.eveningCutoff;
+          const [h, m] = eveningTime.split(':').map(Number);
+          const eveningDisplay = h >= 12 ? `${h === 12 ? 12 : h - 12}:${String(m).padStart(2, '0')} PM` : `${h === 0 ? 12 : h}:${String(m).padStart(2, '0')} AM`;
+          const cutoffE = document.getElementById('cutoffNoticeEvening');
+          if (cutoffE) cutoffE.innerText = eveningDisplay;
+        }
+
+        // Configure Flatpickr dynamically based on district morning cutoff settings
+        if (dist.morningCutoff && typeof flatpickr !== 'undefined') {
+          const earliestDate = getEarliestAllowedNilDietDate(dist.morningCutoff);
+          flatpickr("#nilFromDate", {
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "d-m-Y",
+            minDate: earliestDate,
+            placeholder: "Select Start Date"
+          });
+          flatpickr("#nilToDate", {
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "d-m-Y",
+            minDate: earliestDate,
+            placeholder: "Select End Date"
+          });
+        }
+      }
+    }
+
+    // 2. Fetch notice board notices
+    const noticesRes = await fetch(`${BACKEND_BASE_URL}/api/notifications`, { headers: getAuthHeaders() });
+    const noticesData = await noticesRes.json();
+    if (noticesRes.ok) {
+      const container = document.getElementById('noticesListContainer');
+      container.innerHTML = '';
+
+      if (noticesData.data.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; margin-top: 1.5rem;">No notices or bulletins published.</p>';
+        return;
+      }
+
+      noticesData.data.forEach(n => {
+        container.innerHTML += `
+          <div class="notice-card">
+            <!-- Glowing accent decoration inside the card -->
+            <div style="position: absolute; top: -50px; right: -50px; width: 120px; height: 120px; background: rgba(255, 74, 90, 0.12); filter: blur(30px); border-radius: 50%; pointer-events: none;"></div>
+            
+            <div style="display: flex; align-items: flex-start; gap: 1.1rem; position: relative; z-index: 2;">
+              <!-- Megaphone Icon with Pulse ring -->
+              <div class="notice-icon-pulse">
+                <span style="font-size: 1.3rem; line-height: 1; animation: bellShake 2.5s infinite; transform-origin: top center; display: inline-block;">📢</span>
+              </div>
+              
+              <div style="flex: 1;">
+                <h4 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">${n.title}</h4>
+                <p style="font-size: 0.95rem; color: #334155; line-height: 1.6; margin-bottom: 0.85rem; font-family: 'Inter', sans-serif;">${n.content}</p>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; border-top: 1px dashed rgba(29, 78, 216, 0.15); padding-top: 0.6rem; margin-top: 0.5rem;">
+                  <span>Posted By: <strong style="color: var(--accent-color);">${n.postedByName}</strong></span>
+                  <span>Date: ${new Date(n.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load member district summary notices:', err);
   }
 }
 
 /* ==========================================================================
-   Utilities helpers
+   6. Export Reports helper: Generates dynamic CSV file triggers
    ========================================================================== */
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function downloadCSV(data, filename, type) {
+  if (data.length === 0) return;
+
+  const csvRows = [];
+
+  // Metadata headers for District reports
+  const isDistrictReport = type === 'users' || type === 'activity_logs';
+  if (isDistrictReport) {
+    const districtName = document.getElementById('statDistrictName') ? document.getElementById('statDistrictName').innerText.trim() : 'N/A';
+    const reportTitle = type === 'users' ? 'District Mess User Register' : 'District System Security Logs';
+    const startDate = document.getElementById('reportStartDate') ? document.getElementById('reportStartDate').value : '';
+    const endDate = document.getElementById('reportEndDate') ? document.getElementById('reportEndDate').value : '';
+
+    csvRows.push(`District Name,"${districtName.replace(/"/g, '""')}"`);
+    csvRows.push(`Report Name,"${reportTitle}"`);
+    csvRows.push(`From Date,"${startDate || 'All'}"`);
+    csvRows.push(`Till Date,"${endDate || 'All'}"`);
+
+    if (type === 'users') {
+      const rateNormal = document.getElementById('rateNormalDiet') ? document.getElementById('rateNormalDiet').value : '30.00';
+      const rateHalf = document.getElementById('rateHalfSpecialDiet') ? document.getElementById('rateHalfSpecialDiet').value : '50.00';
+      const rateFull = document.getElementById('rateFullSpecialDiet') ? document.getElementById('rateFullSpecialDiet').value : '50.00';
+
+      csvRows.push(`NormalRate (Rs.),"${rateNormal}"`);
+      csvRows.push(`HalfSpecialRate (Rs.),"${rateHalf}"`);
+      csvRows.push(`FullSpecialRate (Rs.),"${rateFull}"`);
+    }
+
+    csvRows.push(''); // Blank line to separate metadata header from table data
+  }
+
+  const headers = Object.keys(data[0]);
+
+  // Headers row
+  csvRows.push(headers.join(','));
+
+  // Data rows
+  for (const row of data) {
+    const values = headers.map(header => {
+      const val = row[header];
+      const escaped = ('' + (val === null || val === undefined ? '' : val)).replace(/"/g, '""');
+      return `"${escaped}"`;
+    });
+    csvRows.push(values.join(','));
+  }
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
-/**
- * Export HTML table to PDF using jsPDF and jsPDF-AutoTable
- */
-function exportTableToPDF(tableId, filename, titleText) {
+/* ==========================================================================
+   District Admin Dashboard Helpers (Menu, Attendance, Bills)
+   ========================================================================== */
+
+async function loadAdminMenuTable() {
+  const tbody = document.getElementById('adminMenuTableBody');
+  if (!tbody) return;
   try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.setTextColor(11, 34, 64); // --primary-color (Steel Navy Blue)
-    doc.text(titleText, 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // --text-secondary
-    doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 28);
-    
-    // Use autotable to render table, ignoring columns containing buttons/actions if present
-    doc.autoTable({
-      html: `#${tableId}`,
-      startY: 32,
-      theme: 'grid',
-      headStyles: { fillColor: [11, 34, 64] }, // Steel Navy
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { top: 30 },
-      didParseCell: function(data) {
-        // Remove button elements text from output PDF cells
-        if (data.cell.raw && data.cell.raw.innerHTML && data.cell.raw.innerHTML.includes('<button')) {
-          data.cell.text = '';
-        }
-        
-        // Remove emoji characters to prevent garbled PDF encoding (e.g. 'L& &N&o or '&& &Y&e&s)
-        if (data.cell.text) {
-          const cleanText = (str) => {
-            if (typeof str !== 'string') return str;
-            return str.replace(/[✅❌]/g, '').trim();
-          };
-          if (Array.isArray(data.cell.text)) {
-            data.cell.text = data.cell.text.map(cleanText);
-          } else {
-            data.cell.text = cleanText(data.cell.text);
-          }
-        }
-      }
-    });
-    
-    doc.save(filename);
+    const response = await fetch(`${BACKEND_BASE_URL}/api/menu`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      data.forEach(m => {
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${m.dayOfWeek}</strong></td>
+            <td style="text-align: center;">${m.morningNormal}</td>
+            <td style="text-align: center;">${m.eveningNormal}</td>
+            <td style="text-align: center;">${m.morningHalfSpecial}</td>
+            <td style="text-align: center;">${m.eveningHalfSpecial}</td>
+            <td style="text-align: center;">${m.morningFullSpecial}</td>
+            <td style="text-align: center;">${m.eveningFullSpecial}</td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="editMenu(${m.id}, '${m.dayOfWeek}', '${m.morningNormal.replace(/'/g, "\\'")}', '${m.morningHalfSpecial.replace(/'/g, "\\'")}', '${m.morningFullSpecial.replace(/'/g, "\\'")}', '${m.eveningNormal.replace(/'/g, "\\'")}', '${m.eveningHalfSpecial.replace(/'/g, "\\'")}', '${m.eveningFullSpecial.replace(/'/g, "\\'")}')">Edit</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
   } catch (err) {
-    console.error('Failed to export PDF:', err);
-    alert('Failed to generate PDF. Make sure jsPDF script dependencies are loaded.');
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--error);">Error loading menu.</td></tr>';
   }
 }
-window.exportTableToPDF = exportTableToPDF; // make it globally accessible
 
-async function downloadAttendancePDF(month, year) {
+function editMenu(id, day, morningNormal, morningHalfSpecial, morningFullSpecial, eveningNormal, eveningHalfSpecial, eveningFullSpecial) {
+  document.getElementById('editMenuDayId').value = id;
+  document.getElementById('editMenuDayName').innerText = `Modify Menu for ${day}`;
+  document.getElementById('editMenuMorningNormal').value = morningNormal;
+  document.getElementById('editMenuMorningHalfSpecial').value = morningHalfSpecial;
+  document.getElementById('editMenuMorningFullSpecial').value = morningFullSpecial;
+  document.getElementById('editMenuEveningNormal').value = eveningNormal;
+  document.getElementById('editMenuEveningHalfSpecial').value = eveningHalfSpecial;
+  document.getElementById('editMenuEveningFullSpecial').value = eveningFullSpecial;
+  document.getElementById('editMenuOverlay').classList.add('active');
+}
+
+function closeEditMenuModal() {
+  document.getElementById('editMenuOverlay').classList.remove('active');
+}
+
+async function loadAttendanceSummary(date) {
+  const tbody = document.getElementById('dailyAttendanceTableBody');
   try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BACKEND_BASE_URL}/api/users/export-attendance?month=${month}&year=${year}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/summary?date=${date}`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      document.getElementById('countMorningNormal').innerText = data.morningNormal;
+      document.getElementById('countMorningHalfSpecial').innerText = data.morningHalfSpecial;
+      document.getElementById('countMorningFullSpecial').innerText = data.morningFullSpecial;
+      document.getElementById('countEveningNormal').innerText = data.eveningNormal;
+      document.getElementById('countEveningHalfSpecial').innerText = data.eveningHalfSpecial;
+      document.getElementById('countEveningFullSpecial').innerText = data.eveningFullSpecial;
+      document.getElementById('countTotalMeals').innerText = data.grandTotal;
+
+      if (tbody) {
+        tbody.innerHTML = '';
+        if (!data.membersAttendance || data.membersAttendance.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">No district members registered.</td></tr>';
+          return;
+        }
+        data.membersAttendance.forEach(m => {
+          let colsHtml = '';
+          let actionBtnHtml = '';
+
+          const isMorningNil = m.isNilExcluded && m.nilMorning;
+          const isEveningNil = m.isNilExcluded && m.nilEvening;
+
+          const nilBadgeHtml = `<span class="badge" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 4px;">NIL</span>`;
+
+          const morningNormalStatus = isMorningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.morningNormal ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+          
+          const morningHalfSpecialStatus = isMorningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.morningHalfSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+          
+          const morningFullSpecialStatus = isMorningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.morningFullSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+
+          const eveningNormalStatus = isEveningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.eveningNormal ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+          
+          const eveningHalfSpecialStatus = isEveningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.eveningHalfSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+          
+          const eveningFullSpecialStatus = isEveningNil 
+            ? nilBadgeHtml 
+            : (m.attendance.eveningFullSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+
+          colsHtml = `
+            <td style="text-align: center;">${morningNormalStatus}</td>
+            <td style="text-align: center;">${eveningNormalStatus}</td>
+            <td style="text-align: center;">${morningHalfSpecialStatus}</td>
+            <td style="text-align: center;">${eveningHalfSpecialStatus}</td>
+            <td style="text-align: center;">${morningFullSpecialStatus}</td>
+            <td style="text-align: center;">${eveningFullSpecialStatus}</td>
+          `;
+
+          if (isMorningNil && isEveningNil) {
+            actionBtnHtml = `<button class="btn btn-accent" disabled style="opacity: 0.5; cursor: not-allowed; padding: 0.3rem 0.6rem; font-size: 0.8rem;">Locked (NIL)</button>`;
+          } else {
+            actionBtnHtml = `<button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openMarkAttendanceModalFromSummary(${m.userId}, '${m.fullName.replace(/'/g, "\\'")}', '${date}')">Manage</button>`;
+          }
+
+          tbody.innerHTML += `
+            <tr ${m.isNilExcluded ? 'style="background: rgba(239, 68, 68, 0.02);"' : ''}>
+              <td><strong>${m.fullName}</strong></td>
+              <td>${m.email}</td>
+              ${colsHtml}
+              <td>
+                ${actionBtnHtml}
+              </td>
+            </tr>
+          `;
+        });
       }
-    });
-    if (!response.ok) throw new Error('Failed to fetch attendance data.');
-    const csvText = await response.text();
-    
-    // Parse CSV into rows and cells
-    const rows = csvText.split('\n')
-      .map(row => row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim()))
-      .filter(row => row.length > 1 && row[0].toLowerCase() !== 'id'); // skip headers and empty rows
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.setTextColor(11, 34, 64);
-    doc.text(`UP Police Mess - Monthly Attendance Report (${month}/${year})`, 14, 20);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 28);
-    
-    // AutoTable layout
-    doc.autoTable({
-      head: [['ID', 'Date', 'Officer Name', 'PNO', 'Rank', 'Posting Unit', 'Breakfast', 'Lunch', 'Dinner']],
-      body: rows,
-      startY: 32,
-      theme: 'grid',
-      headStyles: { fillColor: [11, 34, 64] },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      margin: { top: 30 }
-    });
-    
-    doc.save(`attendance_report_${month}_${year}.pdf`);
+    }
   } catch (err) {
-    showNotification(`PDF export failed: ${err.message}`, 'error');
+    console.error('Failed to load attendance summary:', err);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--error);">Error loading attendance details.</td></tr>';
+    }
+  }
+}
+
+function openMarkAttendanceModalFromSummary(userId, fullName, date) {
+  document.getElementById('attendanceUserId').value = userId;
+  document.getElementById('attendanceModalTitle').innerText = `Mark Attendance - ${fullName}`;
+
+  const dateInput = document.getElementById('adminAttendanceDate');
+  if (window.adminAttendancePicker) {
+    window.adminAttendancePicker.setDate(date);
+  } else {
+    dateInput.value = date;
+  }
+
+  fetchAndSetAdminAttendance(userId, date);
+
+  document.getElementById('markAttendanceOverlay').classList.add('active');
+}
+
+async function loadMealRates() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills/rates`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      document.getElementById('rateNormalDiet').value = data.normalDiet;
+      document.getElementById('rateHalfSpecialDiet').value = data.halfSpecialDiet;
+      document.getElementById('rateFullSpecialDiet').value = data.fullSpecialDiet;
+    }
+  } catch (err) {
+    console.error('Failed to load rates:', err);
+  }
+}
+
+async function loadBillsTable() {
+  const tbody = document.getElementById('billsTableBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No monthly bills found.</td></tr>';
+        return;
+      }
+      data.forEach(b => {
+        const badgeClass = b.status === 'paid' ? 'success' : 'warning';
+        const actionBtn = b.status === 'unpaid'
+          ? `<button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="recordPayment(${b.id})">Mark Paid</button>`
+          : `<span style="font-size: 0.85rem; color: var(--success); font-weight: 600;">Paid</span>`;
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${b.userName || 'Member'}</strong></td>
+            <td>${b.month}/${b.year}</td>
+            <td>${b.totalMeals}</td>
+            <td>Rs. ${b.totalAmount}</td>
+            <td><span class="badge badge-${badgeClass}">${b.status.toUpperCase()}</span></td>
+            <td>${actionBtn}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading bills.</td></tr>';
+  }
+}
+
+function recordPayment(billId) {
+  document.getElementById('paymentBillId').value = billId;
+  document.getElementById('paymentTransactionId').value = '';
+  document.getElementById('recordPaymentOverlay').classList.add('active');
+}
+
+function closeRecordPaymentModal() {
+  document.getElementById('recordPaymentOverlay').classList.remove('active');
+}
+
+/* ==========================================================================
+   Member Portal Helpers (Menu, Attendance, Bills)
+   ========================================================================== */
+
+async function loadMemberMenuTable() {
+  const tbody = document.getElementById('memberMenuTableBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/menu`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      data.forEach(m => {
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${m.dayOfWeek}</strong></td>
+            <td style="text-align: center;">${m.morningNormal}</td>
+            <td style="text-align: center;">${m.eveningNormal}</td>
+            <td style="text-align: center;">${m.morningHalfSpecial}</td>
+            <td style="text-align: center;">${m.eveningHalfSpecial}</td>
+            <td style="text-align: center;">${m.morningFullSpecial}</td>
+            <td style="text-align: center;">${m.eveningFullSpecial}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--error);">Error loading menu.</td></tr>';
+  }
+}
+
+async function loadMemberAttendanceHistory() {
+  const tbody = document.getElementById('memberAttendanceTableBody');
+  if (!tbody) return;
+
+  const selectMonth = document.getElementById('memberHistoryMonth');
+  const inputYear = document.getElementById('memberHistoryYear');
+
+  if (selectMonth && !selectMonth.dataset.initialized) {
+    const today = new Date();
+    selectMonth.value = today.getMonth() + 1;
+    inputYear.value = today.getFullYear();
+    selectMonth.dataset.initialized = 'true';
+  }
+
+  const selectedMonth = parseInt(selectMonth.value);
+  const selectedYear = parseInt(inputYear.value);
+
+  try {
+    const nilsResponse = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, { headers: getAuthHeaders() });
+    const nilsData = await nilsResponse.json();
+    const approvedNils = nilsResponse.ok ? nilsData.filter(r => r.status === 'approved') : [];
+
+    const response = await fetch(`${BACKEND_BASE_URL}/api/attendance/history`, { headers: getAuthHeaders() });
+    const history = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+
+      const todayDate = new Date();
+      const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
+      const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        // Construct date string YYYY-MM-DD
+        const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        // Format date as DD-MM-YYYY
+        const displayDate = `${String(day).padStart(2, '0')}-${String(selectedMonth).padStart(2, '0')}-${selectedYear}`;
+        const isToday = dateStr === todayStr;
+
+        const dateHtml = isToday 
+          ? `<span class="badge" style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #fff; font-weight: 700; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.45); border: 1px solid rgba(255, 255, 255, 0.1); letter-spacing: 0.5px; display: inline-block;">${displayDate} <span style="font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.9;">(Today)</span></span>`
+          : `<strong>${displayDate}</strong>`;
+
+        // Check if date falls in any approved nil diet range
+        const matchedNil = approvedNils.find(r => {
+          const start = r.fromDate.split('T')[0];
+          const end = r.toDate.split('T')[0];
+          return dateStr >= start && dateStr <= end;
+        });
+
+        const isMorningNil = matchedNil ? !!matchedNil.morningDiet : false;
+        const isEveningNil = matchedNil ? !!matchedNil.eveningDiet : false;
+
+        // Find record
+        const record = history.find(r => r.date.split('T')[0] === dateStr);
+
+        const nilBadgeHtml = `<span class="badge" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 4px;">NIL</span>`;
+
+        const morningNormalStatus = isMorningNil 
+          ? nilBadgeHtml 
+          : (record && record.morningNormal ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+        const morningHalfSpecialStatus = isMorningNil 
+          ? nilBadgeHtml 
+          : (record && record.morningHalfSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+        const morningFullSpecialStatus = isMorningNil 
+          ? nilBadgeHtml 
+          : (record && record.morningFullSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+
+        const eveningNormalStatus = isEveningNil 
+          ? nilBadgeHtml 
+          : (record && record.eveningNormal ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+        const eveningHalfSpecialStatus = isEveningNil 
+          ? nilBadgeHtml 
+          : (record && record.eveningHalfSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+        const eveningFullSpecialStatus = isEveningNil 
+          ? nilBadgeHtml 
+          : (record && record.eveningFullSpecial ? '<span style="color: var(--success); font-weight: 600;">✅ Eaten</span>' : '<span style="color: var(--text-secondary);">❌ No</span>');
+
+        tbody.innerHTML += `
+          <tr ${matchedNil ? 'style="background: rgba(245, 158, 11, 0.02);"' : ''}>
+            <td>${dateHtml}</td>
+            <td style="text-align: center;">${morningNormalStatus}</td>
+            <td style="text-align: center;">${eveningNormalStatus}</td>
+            <td style="text-align: center;">${morningHalfSpecialStatus}</td>
+            <td style="text-align: center;">${eveningHalfSpecialStatus}</td>
+            <td style="text-align: center;">${morningFullSpecialStatus}</td>
+            <td style="text-align: center;">${eveningFullSpecialStatus}</td>
+          </tr>
+        `;
+      }
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--error);">Error loading history.</td></tr>';
+  }
+}
+
+async function loadMemberBillsTable() {
+  const tbody = document.getElementById('memberBillsTableBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/bills`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No monthly bills generated.</td></tr>';
+        return;
+      }
+      data.forEach(b => {
+        const badgeClass = b.status === 'paid' ? 'success' : 'warning';
+        tbody.innerHTML += `
+          <tr>
+            <td><strong>${b.month}/${b.year}</strong></td>
+            <td>${b.totalMeals}</td>
+            <td>Rs. ${b.totalAmount}</td>
+            <td><span class="badge badge-${badgeClass}">${b.status.toUpperCase()}</span></td>
+            <td>${new Date(b.createdAt).toLocaleDateString()}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Error loading bills.</td></tr>';
+  }
+}
+
+async function loadMemberNilDietRequests() {
+  const tbody = document.getElementById('nilDietHistoryBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No requests submitted yet.</td></tr>';
+        return;
+      }
+      data.forEach(r => {
+        let badgeClass = 'warning';
+        if (r.status === 'approved') badgeClass = 'success';
+        if (r.status === 'rejected') badgeClass = 'danger';
+
+        const fromParts = r.fromDate.split('-');
+        const toParts = r.toDate.split('-');
+        const displayFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`;
+        const displayTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`;
+
+        const sessionsStr = (r.morningDiet && r.eveningDiet) 
+          ? 'Morning & Evening' 
+          : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+
+        const deleteButtonHtml = r.status === 'pending'
+          ? `<button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteNilDietRequest(${r.id})">Delete</button>`
+          : `<span style="color: var(--text-muted); font-size: 0.85rem;">Locked</span>`;
+
+        tbody.innerHTML += `
+          <tr>
+            <td style="text-align: center;"><strong>${displayFrom}</strong></td>
+            <td style="text-align: center;"><strong>${displayTo}</strong></td>
+            <td style="text-align: center; font-size: 0.85rem; color: var(--accent-light); font-weight: 600;">${sessionsStr}</td>
+            <td style="text-align: center;"><span class="badge badge-${badgeClass}">${r.status.toUpperCase()}</span></td>
+            <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">${new Date(r.createdAt).toLocaleString()}</td>
+            <td style="text-align: center;">
+              ${deleteButtonHtml}
+            </td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--error);">Error loading requests.</td></tr>';
+  }
+}
+
+async function loadNilDietRequestsAdmin() {
+  const tbody = document.getElementById('nilDietsAdminTableBody');
+  if (!tbody) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, { headers: getAuthHeaders() });
+    const data = await response.json();
+    if (response.ok) {
+      // Calculate pending request count
+      const pendingRequests = data.filter(r => r.status === 'pending');
+      const pendingCount = pendingRequests.length;
+
+      // Update Tab count badge
+      const badge = document.getElementById('nilDietRequestBadge');
+      if (badge) {
+        if (pendingCount > 0) {
+          badge.innerText = pendingCount;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      // Update Summary Tab alert banner
+      const alertBanner = document.getElementById('pendingNilDietAlert');
+      const alertCount = document.getElementById('pendingNilDietAlertCount');
+      if (alertBanner && alertCount) {
+        if (pendingCount > 0) {
+          alertCount.innerText = pendingCount;
+          alertBanner.style.display = 'block';
+        } else {
+          alertBanner.style.display = 'none';
+        }
+      }
+
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No nil diet requests found.</td></tr>';
+        return;
+      }
+      data.forEach(r => {
+        let badgeClass = 'warning';
+        if (r.status === 'approved') badgeClass = 'success';
+        if (r.status === 'rejected') badgeClass = 'danger';
+
+        const fromParts = r.fromDate.split('-');
+        const toParts = r.toDate.split('-');
+        const displayFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`;
+        const displayTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`;
+
+        const sessionsStr = (r.morningDiet && r.eveningDiet) 
+          ? 'Morning & Evening' 
+          : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+
+        let actionHtml = '';
+        if (r.status === 'pending') {
+          actionHtml = `
+            <button class="btn btn-success" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="manageNilDietRequest(${r.id}, 'approve')">Approve</button>
+            <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; margin-right: 0.25rem;" onclick="manageNilDietRequest(${r.id}, 'reject')">Reject</button>
+          `;
+        }
+        actionHtml += `
+          <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteNilDietRequest(${r.id})">Delete</button>
+        `;
+
+        tbody.innerHTML += `
+          <tr>
+            <td style="text-align: center;"><strong>${r.memberName}</strong></td>
+            <td style="text-align: center;">${r.memberEmail}</td>
+            <td style="text-align: center;"><strong>${displayFrom}</strong></td>
+            <td style="text-align: center;"><strong>${displayTo}</strong></td>
+            <td style="text-align: center; font-size: 0.85rem; color: var(--accent-light); font-weight: 600;">${sessionsStr}</td>
+            <td style="text-align: center;"><span class="badge badge-${badgeClass}">${r.status.toUpperCase()}</span></td>
+            <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">${new Date(r.createdAt).toLocaleString()}</td>
+            <td style="text-align: center;">${actionHtml}</td>
+          </tr>
+        `;
+      });
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--error);">Error loading requests.</td></tr>';
+  }
+}
+
+async function manageNilDietRequest(id, action) {
+  if (!confirm(`Are you sure you want to ${action} this request?`)) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet/${id}/${action}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Failed to ${action} request.`);
+    showNotification(`Request successfully ${action}d.`, 'success');
+    loadNilDietRequestsAdmin();
+    
+    // Refresh attendance summaries
+    const summaryDate = document.getElementById('attendanceSummaryDate')?.value;
+    if (summaryDate) {
+      loadAttendanceSummary(summaryDate);
+    }
+  } catch (err) {
+    showNotification(err.message, 'error');
+  }
+}
+
+async function deleteNilDietRequest(id) {
+  if (!confirm('Are you sure you want to delete this Nil Diet request?')) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete request.');
+    showNotification('Nil Diet request deleted successfully.', 'success');
+
+    // Refresh whichever dashboard lists are present
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && (user.role === 'district_admin' || user.role === 'super_admin')) {
+      loadNilDietRequestsAdmin();
+      const summaryDate = document.getElementById('attendanceSummaryDate')?.value;
+      if (summaryDate) {
+        loadAttendanceSummary(summaryDate);
+      }
+    } else {
+      loadMemberNilDietRequests();
+      loadMemberAttendanceHistory();
+    }
+  } catch (err) {
+    showNotification(err.message, 'error');
   }
 }

@@ -1,50 +1,63 @@
-const jwt = require('jsonwebtoken');
+const { verifyToken } = require('../utils/jwt');
+const { UnauthorizedError, ForbiddenError } = require('../utils/errors');
 
-/**
- * Middleware to verify JWT token in authorization header.
- */
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    console.warn('>>> [SECURITY WARNING] Missing authorization token.');
-    return res.status(401).json({ error: 'Access token is missing. Please log in.' });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next(new UnauthorizedError('Access token is missing or invalid.'));
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key', (err, user) => {
-    if (err) {
-      console.warn('>>> [SECURITY WARNING] Invalid or expired token presented.');
-      return res.status(403).json({ error: 'Token is invalid or expired. Access denied.' });
-    }
-    req.user = user;
-    next();
-  });
-}
+  const token = authHeader.split(' ')[1];
+  const decoded = verifyToken(token);
 
-/**
- * Middleware to restrict route access by role.
- * Supports a single role string or an array of permitted roles.
- */
-function requireRole(roleNames) {
-  const allowedRoles = Array.isArray(roleNames) ? roleNames : [roleNames];
-  
-  return (req, res, next) => {
-    if (!req.user || !req.user.roleName) {
-      console.warn(`>>> [SECURITY WARNING] User lacks active session user roles.`);
-      return res.status(403).json({ error: 'Unauthorized. Role mapping missing.' });
-    }
+  if (!decoded) {
+    return next(new UnauthorizedError('Token is invalid or has expired.'));
+  }
 
-    if (!allowedRoles.includes(req.user.roleName)) {
-      console.warn(`>>> [SECURITY WARNING] Access denied. User role: "${req.user.roleName}" tried to access resource requiring: [${allowedRoles.join(', ')}].`);
-      return res.status(403).json({ error: 'Access forbidden. Insufficient privileges.' });
-    }
+  req.user = decoded;
+  next();
+};
 
-    next();
-  };
-}
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new UnauthorizedError('Authentication required.'));
+  }
+
+  if (req.user.role !== 'super_admin') {
+    return next(new ForbiddenError('Access restricted to Super Admins only.'));
+  }
+
+  next();
+};
+
+const requireDistrictAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new UnauthorizedError('Authentication required.'));
+  }
+
+  if (req.user.role !== 'district_admin') {
+    return next(new ForbiddenError('Access restricted to District Admins only.'));
+  }
+
+  next();
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new UnauthorizedError('Authentication required.'));
+  }
+
+  if (req.user.role !== 'super_admin' && req.user.role !== 'district_admin') {
+    return next(new ForbiddenError('Access restricted to administrative users.'));
+  }
+
+  next();
+};
 
 module.exports = {
-  authenticateToken,
-  requireRole
+  authenticate,
+  requireSuperAdmin,
+  requireDistrictAdmin,
+  requireAdmin,
 };

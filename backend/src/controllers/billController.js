@@ -1,5 +1,5 @@
 const { db } = require('../db/index');
-const { monthlyBills, payments, policeUsers, mealAttendance } = require('../db/schema');
+const { monthlyBills, payments, users, mealAttendance } = require('../db/schema');
 const { eq, and, sql } = require('drizzle-orm');
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +18,7 @@ function loadRates() {
   } catch (err) {
     console.error('>>> [RATES READ ERROR] Failed to load rates config:', err);
   }
-  return { breakfast: 30.00, lunch: 50.00, dinner: 50.00 }; // Indian Rupees defaults
+  return { normalDiet: 30.00, halfSpecialDiet: 50.00, fullSpecialDiet: 50.00 }; // Indian Rupees defaults
 }
 
 /**
@@ -55,18 +55,18 @@ async function getRates(req, res, next) {
  */
 async function setRates(req, res, next) {
   console.log('>>> [CONTROLLER ENTRY] billController.setRates - Params:', req.body);
-  const { breakfast, lunch, dinner } = req.body;
+  const { normalDiet, halfSpecialDiet, fullSpecialDiet } = req.body;
   const adminId = req.user.id;
 
   try {
-    if (breakfast === undefined || lunch === undefined || dinner === undefined) {
-      return res.status(400).json({ error: 'Breakfast, Lunch, and Dinner rates are required.' });
+    if (normalDiet === undefined || halfSpecialDiet === undefined || fullSpecialDiet === undefined) {
+      return res.status(400).json({ error: 'NormalDiet, HalfSpecialDiet, and FullSpecialDiet rates are required.' });
     }
 
     const rates = {
-      breakfast: parseFloat(breakfast),
-      lunch: parseFloat(lunch),
-      dinner: parseFloat(dinner)
+      normalDiet: parseFloat(normalDiet),
+      halfSpecialDiet: parseFloat(halfSpecialDiet),
+      fullSpecialDiet: parseFloat(fullSpecialDiet)
     };
 
     const success = saveRates(rates);
@@ -74,7 +74,7 @@ async function setRates(req, res, next) {
       return res.status(500).json({ error: 'Failed to save updated rates.' });
     }
 
-    await logAudit(adminId, 'SET_RATES', `Updated meal rates: B: ${rates.breakfast}, L: ${rates.lunch}, D: ${rates.dinner}`);
+    await logAudit(adminId, 'SET_RATES', `Updated meal rates: N: ${rates.normalDiet}, H: ${rates.halfSpecialDiet}, F: ${rates.fullSpecialDiet}`);
 
     return res.status(200).json({ message: 'Rates updated successfully!', rates });
   } catch (error) {
@@ -89,14 +89,24 @@ async function generateMonthlyBills(req, res, next) {
   console.log('>>> [CONTROLLER ENTRY] billController.generateMonthlyBills - Params:', req.body);
   const { month, year } = req.body; // e.g. month: 7, year: 2026
   const adminId = req.user.id;
+  const adminDistrictId = req.user.districtId;
 
   try {
     if (!month || !year) {
       return res.status(400).json({ error: 'Month and Year parameters are required.' });
     }
+    if (!adminDistrictId) {
+      return res.status(400).json({ error: 'Admin is not assigned to a district.' });
+    }
 
     const rates = loadRates();
-    const activeUsers = await db.select().from(policeUsers).where(eq(policeUsers.status, 'active'));
+    const activeUsers = await db.select().from(users).where(
+      and(
+        eq(users.isActive, true),
+        eq(users.role, 'user'),
+        eq(users.districtId, adminDistrictId)
+      )
+    );
 
     let generatedCount = 0;
 
@@ -115,18 +125,21 @@ async function generateMonthlyBills(req, res, next) {
         );
 
       // 2. Count consumed meals
-      let breakfastCount = 0;
-      let lunchCount = 0;
-      let dinnerCount = 0;
+      let normalDietCount = 0;
+      let halfSpecialDietCount = 0;
+      let fullSpecialDietCount = 0;
 
       attendanceRecords.forEach(record => {
-        if (record.breakfast) breakfastCount++;
-        if (record.lunch) lunchCount++;
-        if (record.dinner) dinnerCount++;
+        if (record.morningNormal) normalDietCount++;
+        if (record.eveningNormal) normalDietCount++;
+        if (record.morningHalfSpecial) halfSpecialDietCount++;
+        if (record.eveningHalfSpecial) halfSpecialDietCount++;
+        if (record.morningFullSpecial) fullSpecialDietCount++;
+        if (record.eveningFullSpecial) fullSpecialDietCount++;
       });
 
-      const totalMeals = breakfastCount + lunchCount + dinnerCount;
-      const totalAmount = (breakfastCount * rates.breakfast) + (lunchCount * rates.lunch) + (dinnerCount * rates.dinner);
+      const totalMeals = normalDietCount + halfSpecialDietCount + fullSpecialDietCount;
+      const totalAmount = (normalDietCount * rates.normalDiet) + (halfSpecialDietCount * rates.halfSpecialDiet) + (fullSpecialDietCount * rates.fullSpecialDiet);
 
       // 3. Insert or update the monthly bill record
       const [existingBill] = await db.select().from(monthlyBills)
@@ -153,6 +166,7 @@ async function generateMonthlyBills(req, res, next) {
       } else {
         await db.insert(monthlyBills).values({
           userId: user.id,
+          districtId: user.districtId,
           month: parseInt(month),
           year: parseInt(year),
           totalMeals,
@@ -179,19 +193,24 @@ async function generateMonthlyBills(req, res, next) {
  */
 async function getBills(req, res, next) {
   const userId = req.user.id;
-  const roleName = req.user.roleName;
+  const role = req.user.role;
+  const userDistrictId = req.user.districtId;
 
   try {
     let billsList;
 
-    if (roleName === 'Admin') {
+    if (role === 'district_admin' || role === 'super_admin') {
       // Fetch all bills and join with user details
+      const conditions = [];
+      if (role === 'district_admin' && userDistrictId) {
+        conditions.push(eq(monthlyBills.districtId, userDistrictId));
+      }
+
       billsList = await db.select({
         id: monthlyBills.id,
         userId: monthlyBills.userId,
-        userName: policeUsers.name,
-        pno: policeUsers.pno,
-        rank: policeUsers.rank,
+        userName: users.fullName,
+        email: users.email,
         month: monthlyBills.month,
         year: monthlyBills.year,
         totalMeals: monthlyBills.totalMeals,
@@ -200,7 +219,8 @@ async function getBills(req, res, next) {
         createdAt: monthlyBills.createdAt
       })
       .from(monthlyBills)
-      .leftJoin(policeUsers, eq(monthlyBills.userId, policeUsers.id))
+      .leftJoin(users, eq(monthlyBills.userId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(sql`${monthlyBills.year} DESC`, sql`${monthlyBills.month} DESC`);
     } else {
       // Fetch user's own bills
@@ -257,6 +277,7 @@ async function markBillAsPaid(req, res, next) {
     const [paymentRecord] = await db.insert(payments).values({
       billId,
       userId: bill.userId,
+      districtId: bill.districtId,
       amount: bill.totalAmount,
       paymentMode: paymentMode.trim(),
       transactionId: transactionId ? transactionId.trim() : null

@@ -1,21 +1,17 @@
 const express = require('express');
-const router = express.Router();
 const userController = require('../controllers/userController');
-const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
+const { authenticate, requireAdmin } = require('../middleware/authMiddleware');
+const validate = require('../middleware/validationMiddleware');
+const { createUserSchema, updateUserSchema } = require('../validators/userValidator');
 
-// Get personal user profile
-router.get('/profile', authenticateToken, userController.getProfile);
+const router = express.Router();
 
-// Update profile details
-router.post('/profile', authenticateToken, userController.updateProfile);
-
-// List users (Admin only)
-router.get('/list', authenticateToken, requireRole('Admin'), userController.getUsersList);
-
-// Set status (Admin only)
-router.post('/status', authenticateToken, requireRole('Admin'), userController.updateUserStatus);
-
-// Export attendance report as CSV (Admin only)
-router.get('/export-attendance', authenticateToken, requireRole('Admin'), userController.exportAttendanceCsv);
+// Apply administrative auth guards to user management endpoints
+router.get('/', authenticate, requireAdmin, userController.listUsers);
+router.get('/search', authenticate, requireAdmin, userController.searchUsers);
+router.get('/:id', authenticate, userController.getUser);
+router.post('/', authenticate, requireAdmin, validate(createUserSchema), userController.createUser);
+router.put('/:id', authenticate, requireAdmin, validate(updateUserSchema), userController.updateUser);
+router.delete('/:id', authenticate, requireAdmin, userController.deleteUser);
 
 module.exports = router;

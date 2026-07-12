@@ -1,311 +1,81 @@
-const { db } = require('../db/index');
-const { policeUsers, roles } = require('../db/schema');
-const { eq } = require('drizzle-orm');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { logAudit } = require('../utils/logger');
-const { registerFailedAttempt, resetFailedAttempts } = require('../middleware/rateLimiter');
+const authService = require('../services/authService');
+const { sendSuccess } = require('../utils/response');
 
-require('dotenv').config();
-
-const resendApiKey = process.env.RESEND_API_KEY;
-const isResendConfigured = resendApiKey && resendApiKey !== 'placeholder';
-const bypassOtp = process.env.DEV_BYPASS_OTP === 'true';
-const useRealOtp = isResendConfigured && !bypassOtp;
-
-if (isResendConfigured) {
-  console.log('>>> [AUTH INIT] Resend service configured.');
-} else {
-  console.warn('>>> [AUTH WARNING] Resend API Key is missing. Fallback to Mock OTP mode.');
-}
-
-if (bypassOtp) {
-  console.log('>>> [AUTH INFO] DEV_BYPASS_OTP is enabled. Bypassing real OTP verification.');
-}
-
-// In-memory store for active OTP codes: email -> { otp, expiresAt }
-const activeOtps = new Map();
-
-/**
- * Verify a code for an email address
- */
-function verifyStoredOtp(email, token) {
-  if (!email || !token) return false;
-  const key = email.trim().toLowerCase();
-  const record = activeOtps.get(key);
-  if (!record) {
-    console.warn(`>>> [OTP VERIFY] No OTP record found for email: ${key}`);
-    return false;
-  }
-  
-  if (Date.now() > record.expiresAt) {
-    console.warn(`>>> [OTP VERIFY] OTP code expired for: ${key}`);
-    activeOtps.delete(key);
-    return false;
-  }
-
-  if (record.otp === token.trim()) {
-    console.log(`>>> [OTP VERIFY] OTP code successfully verified for: ${key}`);
-    activeOtps.delete(key); // single-use OTP
-    return true;
-  }
-
-  console.warn(`>>> [OTP VERIFY] Invalid OTP token code submitted for: ${key}`);
-  return false;
-}
-
-function isEmailAuthorized(email) {
-  const cleanEmail = email.trim().toLowerCase();
-  
-  // Allow all Gmail accounts automatically
-  if (cleanEmail.endsWith('@gmail.com')) {
-    return true;
-  }
-
-  const allowedEmailsStr = process.env.ALLOWED_EMAILS || '';
-  if (!allowedEmailsStr) {
-    return true; // No restrictions if not configured
-  }
-  const allowedEmails = allowedEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  return allowedEmails.includes(cleanEmail);
-}
-
-/**
- * Endpoint to request signup OTP email
- */
-async function sendOtp(req, res, next) {
-  console.log('>>> [CONTROLLER ENTRY] authController.sendOtp - Params:', req.body);
-  const { email } = req.body;
-  
+const requestOtp = async (req, res, next) => {
   try {
-    if (!email) {
-      return res.status(400).json({ error: 'Email field is required.' });
-    }
-
-    if (!isEmailAuthorized(email)) {
-      console.warn(`>>> [SECURITY WARNING] Unauthorized email registration attempt: ${email}`);
-      return res.status(403).json({ error: 'This email address is not authorized for Mess System registration.' });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const cleanEmail = email.trim().toLowerCase();
-    
-    activeOtps.set(cleanEmail, {
-      otp,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes expiration
-    });
-
-    if (useRealOtp) {
-      console.log(`>>> [AUTH LOG] Sending OTP via Resend for: ${email}`);
-      const senderEmail = process.env.SENDER_EMAIL || 'Mess Manager <onboarding@resend.dev>';
-      
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: senderEmail,
-            to: [cleanEmail],
-            subject: 'UP Police Mess Management - Registration OTP',
-            html: `<h3>UP Police Mess Verification</h3><p>Your registration OTP is <strong>${otp}</strong>.</p><p>This code is valid for 5 minutes.</p>`
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          let apiErrorMessage = errorText;
-          try {
-            const parsed = JSON.parse(errorText);
-            if (parsed.message) {
-              apiErrorMessage = parsed.message;
-            }
-          } catch (_) {}
-          
-          return res.status(response.status).json({
-            error: `Failed to send OTP verification email. ${apiErrorMessage}`
-          });
-        }
-        
-        return res.status(200).json({ message: 'OTP sent successfully! Please check your email inbox.' });
-      } catch (emailError) {
-        console.error('>>> [AUTH ERROR] Resend dispatch failed:', emailError);
-        return res.status(500).json({
-          error: `Failed to send OTP verification email. ${emailError.message || 'Please try again later or contact the administrator.'}`
-        });
-      }
-    } else {
-      console.log(`>>> [MOCK AUTH] Simulated OTP successfully sent to: ${email}`);
-      return res.status(200).json({ 
-        message: `Development Bypass Mode: Enter code "${otp}" to register.` 
-      });
-    }
+    const { email } = req.body;
+    const result = await authService.requestOtp(email);
+    return sendSuccess(res, result, 'Verification OTP dispatched.');
   } catch (error) {
-    console.error('>>> [CONTROLLER ERROR] authController.sendOtp failed:', error);
     next(error);
   }
-}
+};
 
-/**
- * Register a new police officer record
- */
-async function register(req, res, next) {
-  console.log('>>> [CONTROLLER ENTRY] authController.register - Params:', req.body);
-  const { name, pno, rank, postingUnit, mobile, email, password, otp } = req.body;
-
+const register = async (req, res, next) => {
   try {
-    if (!name || !pno || !rank || !postingUnit || !mobile || !email || !password || !otp) {
-      return res.status(400).json({ error: 'All fields are required.' });
-    }
-
-    if (!isEmailAuthorized(email)) {
-      return res.status(403).json({ error: 'This email is not whitelisted.' });
-    }
-
-    // 1. Verify OTP
-    if (useRealOtp) {
-      const isOtpValid = verifyStoredOtp(email, otp);
-      if (!isOtpValid) {
-        return res.status(401).json({ error: 'Invalid or expired OTP code.' });
-      }
-    } else {
-      if (otp.length < 4) {
-        return res.status(401).json({ error: 'Mock OTP must be at least 4 digits.' });
-      }
-    }
-
-    // 2. Check if user already exists (by email or PNO)
-    const existingPno = await db.select().from(policeUsers).where(eq(policeUsers.pno, pno.trim()));
-    if (existingPno.length > 0) {
-      return res.status(409).json({ error: 'A user with this Personal Number (PNO) already exists.' });
-    }
-
-    const existingEmail = await db.select().from(policeUsers).where(eq(policeUsers.email, email.trim().toLowerCase()));
-    if (existingEmail.length > 0) {
-      return res.status(409).json({ error: 'A user with this Email address already exists.' });
-    }
-
-    // 3. Auto-promote admin and Gmail emails for easier developer access/testing
-    const cleanEmail = email.trim().toLowerCase();
-    const isAdminEmail = cleanEmail === 'vicky.nick1991@gmail.com' || cleanEmail.startsWith('admin@');
-    const isGmailEmail = cleanEmail.endsWith('@gmail.com');
-    const roleId = isAdminEmail ? 1 : 2; // 1 = Admin, 2 = Police Personnel
-    const status = (isAdminEmail || isGmailEmail) ? 'active' : 'pending'; // Admins & Gmail users auto-approved
-
-    // 4. Hash password and insert record
-    const passwordHash = bcrypt.hashSync(password, 10);
-    const [newUser] = await db.insert(policeUsers).values({
-      name: name.trim(),
-      pno: pno.trim(),
-      rank: rank.trim(),
-      postingUnit: postingUnit.trim(),
-      mobile: mobile.trim(),
-      email: email.trim().toLowerCase(),
-      passwordHash,
-      roleId,
-      status
-    }).returning();
-
-    await logAudit(newUser.id, 'REGISTRATION', `User successfully registered. Rank: ${rank}, PNO: ${pno}. Status: ${status}`);
-
-    return res.status(201).json({ 
-      message: status === 'active' 
-        ? 'Registration successful! You can log in now.' 
-        : 'Registration successful! Your account is pending Admin approval.'
-    });
+    const result = await authService.register(req.body);
+    return sendSuccess(res, result, 'Registration completed successfully.', 210);
   } catch (error) {
-    console.error('>>> [CONTROLLER ERROR] authController.register failed:', error);
     next(error);
   }
-}
+};
 
-/**
- * Login handler returning JWT token
- */
-async function login(req, res, next) {
-  console.log('>>> [CONTROLLER ENTRY] authController.login - Params:', req.body);
-  const { loginId, password } = req.body; // loginId can be PNO or Email
-  const clientIp = req.ip;
-
+const login = async (req, res, next) => {
   try {
-    if (!loginId || !password) {
-      return res.status(400).json({ error: 'Login ID (PNO/Email) and Password are required.' });
-    }
-
-    // 1. Fetch user by email or pno
-    let user;
-    const isEmail = loginId.includes('@');
-    if (isEmail) {
-      [user] = await db.select().from(policeUsers).where(eq(policeUsers.email, loginId.trim().toLowerCase()));
-    } else {
-      [user] = await db.select().from(policeUsers).where(eq(policeUsers.pno, loginId.trim()));
-    }
-
-    if (!user) {
-      registerFailedAttempt(clientIp);
-      return res.status(401).json({ error: 'Incorrect login credentials.' });
-    }
-
-    // 2. Validate Password
-    const isPasswordCorrect = bcrypt.compareSync(password, user.passwordHash);
-    if (!isPasswordCorrect) {
-      registerFailedAttempt(clientIp);
-      return res.status(401).json({ error: 'Incorrect login credentials.' });
-    }
-
-    // 3. Check Account Status
-    if (user.status !== 'active') {
-      return res.status(403).json({ 
-        error: user.status === 'pending'
-          ? 'Your account registration is pending Admin approval.'
-          : 'Your account has been deactivated. Please contact the Mess In-Charge.'
-      });
-    }
-
-    // 4. Fetch Role Name
-    const [role] = await db.select().from(roles).where(eq(roles.id, user.roleId));
-    const roleName = role ? role.name : 'Police Personnel';
-
-    // 5. Generate secure JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        name: user.name,
-        pno: user.pno,
-        email: user.email,
-        rank: user.rank,
-        roleId: user.roleId,
-        roleName
-      },
-      process.env.JWT_SECRET || 'fallback_secret_key',
-      { expiresIn: '24h' }
-    );
-
-    resetFailedAttempts(clientIp);
-    await logAudit(user.id, 'LOGIN', 'Successful login session started.');
-
-    return res.status(200).json({
-      message: 'Login successful!',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        rank: user.rank,
-        roleName
-      }
-    });
+    const { email, password } = req.body;
+    const result = await authService.login(email, password);
+    return sendSuccess(res, result, 'Login authenticated.');
   } catch (error) {
-    console.error('>>> [CONTROLLER ERROR] authController.login failed:', error);
     next(error);
   }
-}
+};
+
+const refreshToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    const result = await authService.refreshToken(refreshToken);
+    return sendSuccess(res, result, 'Access token refreshed.');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const logout = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    const result = await authService.logout(refreshToken);
+    return sendSuccess(res, result, 'Logged out.');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.forgotPassword(email);
+    return sendSuccess(res, result, 'Reset verification code dispatched.');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const result = await authService.resetPassword(email, otp, newPassword);
+    return sendSuccess(res, result, 'Password reset successful.');
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
-  sendOtp,
+  requestOtp,
   register,
   login,
-  useRealOtp
+  refreshToken,
+  logout,
+  forgotPassword,
+  resetPassword,
 };

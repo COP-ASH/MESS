@@ -1,5 +1,5 @@
 const { db } = require('../db/index');
-const { auditLogs } = require('../db/schema');
+const { activityLogs } = require('../db/schema');
 
 /**
  * Police-grade audit logger. Saves audit trails to database and outputs to console.
@@ -9,7 +9,7 @@ async function logAudit(userId, action, details) {
   console.log(`>>> [AUDIT TRAIL] [${timestamp}] User #${userId || 'System'} | Action: ${action} | Details: ${details || 'N/A'}`);
   
   try {
-    await db.insert(auditLogs).values({
+    await db.insert(activityLogs).values({
       userId: userId || null,
       action,
       details: details || null

@@ -1,15 +1,24 @@
 const express = require('express');
-const router = express.Router();
 const authController = require('../controllers/authController');
-const { loginRateLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validationMiddleware');
+const { authRateLimiter } = require('../middleware/rateLimiter');
+const {
+  registerSchema,
+  loginSchema,
+  getOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} = require('../validators/authValidator');
 
-// OTP dispatch endpoint
-router.post('/send-otp', authController.sendOtp);
+const router = express.Router();
 
-// Personnel registration endpoint
-router.post('/register', authController.register);
-
-// Authentication endpoint (protected by rate limiting)
-router.post('/login', loginRateLimiter, authController.login);
+// Apply rate limits on sensitive authentication endpoints
+router.post('/otp', authRateLimiter, validate(getOtpSchema), authController.requestOtp);
+router.post('/register', validate(registerSchema), authController.register);
+router.post('/login', authRateLimiter, validate(loginSchema), authController.login);
+router.post('/refresh-token', authController.refreshToken);
+router.post('/logout', authController.logout);
+router.post('/forgot-password', authRateLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 
 module.exports = router;

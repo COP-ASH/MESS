@@ -66,7 +66,7 @@ MESS/
 *   `rank`: `text` (Not Null) — `Constable`, `Sub-Inspector`, etc.
 *   `posting_unit`: `text` (Not Null)
 *   `mobile`: `text` (Not Null)
-*   `email`: `text` (Unique, Not Null) — Whitelist verified
+*   `email`: `text` (Unique, Not Null) — Verified via OTP
 *   `password_hash`: `text` (Not Null)
 *   `role_id`: `integer` (Foreign Key referencing `roles.id`)
 *   `status`: `text` (Default: `pending`) — `pending`, `active`, `deactivated`
@@ -132,7 +132,7 @@ Configure the following parameters in `backend/.env`:
 *   `DATABASE_URL`: Connection string to Supabase PostgreSQL database.
 *   `SUPABASE_URL`: Supabase project url.
 *   `SUPABASE_ANON_KEY`: Client authorization key.
-*   `ALLOWED_EMAILS`: Comma-separated list of whitelisted emails allowed to sign up.
+*   `ALLOWED_EMAILS`: (Inactive) Comma-separated list of whitelisted emails allowed to sign up.
 *   `DEV_BYPASS_OTP`: If `true`, bypasses Resend emails and uses mock code `123456`.
 *   `RESEND_API_KEY`: API key for the Resend service.
 *   `JWT_SECRET`: Random character string used to encrypt JWT login tokens.
@@ -143,7 +143,7 @@ Configure the following parameters in `backend/.env`:
 ## 🛠️ REST API Documentation
 
 ### Authentication (`/api/auth`)
-*   `POST /send-otp`: Sends a 6-digit OTP code to the requested email (checks whitelist).
+*   `POST /otp`: Sends a 6-digit OTP code to the requested email for verification.
 *   `POST /register`: Registers a new user. Expects `name`, `pno`, `rank`, `postingUnit`, `mobile`, `email`, `password`, `otp`.
 *   `POST /login`: Validates credentials, checks if account is `active`, rate-limits attempts, and returns a JWT token.
 

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>District Admin Dashboard - Mess Management</title>
+  <link rel="stylesheet" href="style.css?v=1.2">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <style>
+    @keyframes pulse-notification {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .pulse-badge {
+      animation: pulse-notification 1.5s infinite;
+    }
+  </style>
+</head>
+
+<body class="dashboard-page">
+
+  <!-- Header -->
+  <header>
+    <nav class="navbar">
+      <div class="nav-brand" id="adminDistrictHeader">👮 DISTRICT ADMIN PORTAL</div>
+      <ul class="nav-links">
+        <li style="color: var(--text-secondary); font-size: 0.9rem;" id="userGreeting">Loading District Profile...</li>
+        <li style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.85; border-left: 1px solid var(--glass-border); padding-left: 1rem;" id="currentTimeDisplay">--:--</li>
+        <li><button class="btn btn-accent" id="btnLogout" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Logout</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Main container -->
+  <main>
+    <!-- Navigation Tabs -->
+    <nav class="tab-container" aria-label="District Admin Section Tabs">
+      <button class="tab-btn active" onclick="switchTab('tabAnalytics')">District Summary</button>
+      <button class="tab-btn" onclick="switchTab('tabUsers')">User Accounts CRUD</button>
+      <button class="tab-btn" onclick="switchTab('tabMenu')">Manage Mess Menu</button>
+      <button class="tab-btn" onclick="switchTab('tabAttendance')">Attendance Summary</button>
+      <button class="tab-btn" onclick="switchTab('tabBills')">Bills & Rates</button>
+      <button class="tab-btn" onclick="switchTab('tabNotices')">Announcements / Notices</button>
+      <button class="tab-btn" onclick="switchTab('tabReports')">District Reports</button>
+      <button class="tab-btn" onclick="switchTab('tabNilDietsAdmin')">Nil Diet Requests <span id="nilDietRequestBadge" class="badge pulse-badge" style="display: none; background: #ef4444; color: #fff; font-size: 0.7rem; margin-left: 0.4rem; padding: 0.15rem 0.45rem; border-radius: 9999px;">0</span></button>
+      <button class="tab-btn" onclick="switchTab('tabProfile')">Profile Settings</button>
+    </nav>
+
+    <!-- Global alert messages -->
+    <div id="statusMessage" class="message" role="alert" style="margin-bottom: 2rem;"></div>
+
+    <!-- 1. SUMMARY TAB -->
+    <section id="tabAnalytics" class="tab-content active">
+      <!-- Pending Nil Diet Alerts -->
+      <div id="pendingNilDietAlert" class="message message-warning pulse-badge" style="display: none; cursor: pointer; margin-bottom: 2rem; border-left: 5px solid #f59e0b;" onclick="switchTab('tabNilDietsAdmin')">
+        ⚠️ You have <strong id="pendingNilDietAlertCount">0</strong> pending Nil Diet requests from members that need your review. Click here to view.
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="stat-card">
+          <h3>District Assigned</h3>
+          <div class="value" id="statDistrictName" style="font-size: 1.8rem; height: 3.375rem; display: flex; align-items: center;">-</div>
+          <div class="trend" id="statDistrictCode">Code: -</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabUsers')">
+          <h3>Total Mess Personnel</h3>
+          <div class="value" id="statTotalUsers">0</div>
+          <div class="trend">Registered in database</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabUsers')">
+          <h3>Active Members</h3>
+          <div class="value" id="statActiveUsers" style="color: var(--success);">0</div>
+          <div class="trend">Permitted to dine</div>
+        </div>
+        <div class="stat-card" onclick="switchTab('tabUsers')">
+          <h3>Inactive Members</h3>
+          <div class="value" id="statInactiveUsers" style="color: var(--error);">0</div>
+          <div class="trend">Dining suspended</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 2rem;">
+        <!-- Recent Registrations -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1rem;">Recent Registrations (Last 30 Days)</h3>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="recentRegsTableBody">
+                <tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">No recent registrations.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. USER CRUD TAB -->
+    <section id="tabUsers" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">District Mess Members</h3>
+          <div style="display: flex; gap: 0.5rem; width: 100%; max-width: 400px;">
+            <input type="text" id="searchUserInput" class="form-input" placeholder="Search by name/email..." style="padding: 0.5rem 1rem;">
+            <button class="btn btn-accent" id="btnSearchUser" style="padding: 0.5rem 1rem;">Search</button>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateUserModal()">+ Add New Member</button>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Email Address</th>
+                <th>Verification</th>
+                <th>Dining status</th>
+                <th>Registered Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading members registry...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. NOTICE BOARD TAB -->
+    <section id="tabNotices" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">Notice Board Announcements</h3>
+          <button class="btn btn-primary" onclick="openNoticeModal()">+ Post New Announcement</button>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Content Description</th>
+                <th>Posted By</th>
+                <th>Date Posted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="noticesTableBody">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Loading announcements...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. DISTRICT REPORTS TAB -->
+    <section id="tabReports" class="tab-content">
+      <div class="glass-panel" style="max-width: 600px; margin: 0 auto;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">District Reports Generator</h3>
+        <form id="reportForm">
+          <div class="form-group">
+            <label for="selectReportType" class="form-label">Select Report Template</label>
+            <select id="selectReportType" required>
+              <option value="users" selected>Active District Mess Members list</option>
+              <option value="activity_logs">District System Security Logs</option>
+            </select>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="reportStartDate" class="form-label">Start Date (Optional)</label>
+              <input type="text" id="reportStartDate" class="form-input" placeholder="Select Start Date">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="reportEndDate" class="form-label">End Date (Optional)</label>
+              <input type="text" id="reportEndDate" class="form-input" placeholder="Select End Date">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Compile JSON Report & Download</button>
+        </form>
+        
+        <div id="reportSummaryPanel" style="display: none; margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 1.5rem;">
+          <h4 style="font-family: 'Outfit', sans-serif; margin-bottom: 1rem;">Compiled Report Data Preview</h4>
+          <p id="reportSummaryText" style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"></p>
+          <button class="btn btn-accent" id="btnDownloadCsv" style="width: 100%;">Download CSV spreadsheet file</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. PROFILE TAB -->
+    <section id="tabProfile" class="tab-content">
+      <div class="glass-panel" style="max-width: 500px; margin: 0 auto;">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem;">Change Account Password</h3>
+        <form id="passwordChangeForm">
+          <div class="form-group">
+            <label for="inputCurrentPassword" class="form-label">Current Password</label>
+            <input type="password" id="inputCurrentPassword" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label for="inputNewPassword" class="form-label">New Secure Password</label>
+            <input type="password" id="inputNewPassword" class="form-input" placeholder="Min 6 characters" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Update Password</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 6. MANAGE MESS MENU TAB -->
+    <section id="tabMenu" class="tab-content">
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📅 Weekly Menu Management</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                  <th>Day</th>
+                  <th style="text-align: center;">Morning Normal</th>
+                  <th style="text-align: center;">Evening Normal</th>
+                  <th style="text-align: center;">Morning HalfSpecial</th>
+                  <th style="text-align: center;">Evening HalfSpecial</th>
+                  <th style="text-align: center;">Morning FullSpecial</th>
+                  <th style="text-align: center;">Evening FullSpecial</th>
+                  <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminMenuTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading weekly menu...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. ATTENDANCE SUMMARY TAB -->
+    <section id="tabAttendance" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+          <h3 style="font-family: 'Outfit', sans-serif;">Daily Meal Attendance Summary</h3>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label for="attendanceSummaryDate" style="font-size: 0.9rem;">Date:</label>
+            <input type="text" id="attendanceSummaryDate" class="form-input" style="padding: 0.4rem 0.8rem; width: auto;" placeholder="Select Date">
+          </div>
+        </div>
+        <div class="dashboard-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(7, 1fr); gap: 0.5rem;">
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Morning Normal</h3>
+             <div class="value" id="countMorningNormal" style="color: var(--info); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Evening Normal</h3>
+             <div class="value" id="countEveningNormal" style="color: var(--info); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Morning HalfSpecial</h3>
+             <div class="value" id="countMorningHalfSpecial" style="color: var(--success); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Evening HalfSpecial</h3>
+             <div class="value" id="countEveningHalfSpecial" style="color: var(--success); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Morning FullSpecial</h3>
+             <div class="value" id="countMorningFullSpecial" style="color: var(--warning); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Evening FullSpecial</h3>
+             <div class="value" id="countEveningFullSpecial" style="color: var(--warning); font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+           <div class="stat-card" style="padding: 0.75rem 0.4rem; text-align: center;">
+             <h3 style="font-size: 0.75rem; white-space: normal; justify-content: center; line-height: 1.2;">Total Meals</h3>
+             <div class="value" id="countTotalMeals" style="font-size: 1.4rem; margin-top: 0.25rem;">0</div>
+           </div>
+        </div>
+
+        <div class="table-responsive" style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 1.5rem;">
+          <h4 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.2rem; font-size: 1.1rem;">Member Daily Attendance Ledger</h4>
+          <table>
+            <thead>
+              <tr>
+                  <th>Member Name</th>
+                  <th>Email Address</th>
+                  <th style="text-align: center;">Morning Normal</th>
+                  <th style="text-align: center;">Evening Normal</th>
+                  <th style="text-align: center;">Morning HalfSpecial</th>
+                  <th style="text-align: center;">Evening HalfSpecial</th>
+                  <th style="text-align: center;">Morning FullSpecial</th>
+                  <th style="text-align: center;">Evening FullSpecial</th>
+                  <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="dailyAttendanceTableBody">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-secondary);">Select a date and click filter to load.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. BILLS & RATES TAB -->
+    <section id="tabBills" class="tab-content">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Set Rates -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">💰 Set Meal Rates</h3>
+          <form id="ratesForm">
+             <div class="form-group">
+               <label for="rateNormalDiet" class="form-label">NormalDiet Rate (Rs.)</label>
+               <input type="number" step="0.01" id="rateNormalDiet" class="form-input" required>
+             </div>
+             <div class="form-group">
+               <label for="rateHalfSpecialDiet" class="form-label">HalfSpecialDiet Rate (Rs.)</label>
+               <input type="number" step="0.01" id="rateHalfSpecialDiet" class="form-input" required>
+             </div>
+             <div class="form-group">
+                <label for="rateFullSpecialDiet" class="form-label">FullSpecialDiet Rate (Rs.)</label>
+                <input type="number" step="0.01" id="rateFullSpecialDiet" class="form-input" required>
+             </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Update Rates</button>
+          </form>
+        </div>
+
+        <!-- Nil Diet Cutoffs Settings -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">⏱️ Nil Diet Cutoffs</h3>
+          <form id="cutoffSettingsForm">
+            <div class="form-group">
+              <label for="rateMorningCutoff" class="form-label">Morning Diet Cutoff (Same Day)</label>
+              <input type="time" id="rateMorningCutoff" class="form-input" required>
+              <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.25rem;">E.g. 06:00 (6:00 AM) of same day</small>
+            </div>
+            <div class="form-group">
+              <label for="rateEveningCutoff" class="form-label">Evening Diet Cutoff (Same Day)</label>
+              <input type="time" id="rateEveningCutoff" class="form-input" required>
+              <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.25rem;">E.g. 12:00 (12:00 PM) of same day</small>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Update Cutoff Times</button>
+          </form>
+        </div>
+        
+        <!-- Generate Monthly Bills -->
+        <div class="glass-panel" style="margin-bottom: 0;">
+          <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">⚙️ Generate Bills</h3>
+          <form id="generateBillsForm">
+            <div class="form-group">
+              <label for="billMonth" class="form-label">Select Month</label>
+              <select id="billMonth" required>
+                <option value="" disabled selected>Select Month</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="billYear" class="form-label">Select Year</label>
+              <input type="number" id="billYear" class="form-input" value="2026" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Generate / Update Bills</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Bills List -->
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">📜 Member Monthly Bills</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Member Name</th>
+                <th>Period (MM/YYYY)</th>
+                <th>Meals Eaten</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="billsTableBody">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Loading monthly bills...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. NIL DIET REQUESTS ADMIN TAB -->
+    <section id="tabNilDietsAdmin" class="tab-content">
+      <div class="glass-panel">
+        <h3 style="font-family: 'Outfit', sans-serif; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">🛑 Member Nil Diet Requests</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+          Review nil diet requests submitted by personnel in your district. Approving a request will set all meal attendance logs in the specified range to "No" (false) for that member.
+        </p>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center;">Member Name</th>
+                <th style="text-align: center;">Email Address</th>
+                <th style="text-align: center;">From Date</th>
+                <th style="text-align: center;">Till Date</th>
+                <th style="text-align: center;">Session(s)</th>
+                <th style="text-align: center;">Status</th>
+                <th style="text-align: center;">Submitted At</th>
+                <th style="text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="nilDietsAdminTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading nil diet requests...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MEMBER CREATE MODAL -->
+  <div class="overlay" id="createUserOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Add New Mess Member</h3>
+      <form id="createUserForm">
+        <div class="form-group">
+          <label for="memberFullName" class="form-label">Full Name</label>
+          <input type="text" id="memberFullName" class="form-input" placeholder="e.g. Inspector Suresh" required>
+        </div>
+        <div class="form-group">
+          <label for="memberEmail" class="form-label">Email Address</label>
+          <input type="email" id="memberEmail" class="form-input" placeholder="e.g. suresh@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label for="memberPassword" class="form-label">Account Password</label>
+          <input type="password" id="memberPassword" class="form-input" placeholder="Min 6 characters" required>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeCreateUserModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Register Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MEMBER ATTENDANCE MODAL -->
+  <div class="overlay" id="markAttendanceOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;" id="attendanceModalTitle">Mark Attendance</h3>
+      <form id="adminAttendanceForm">
+        <input type="hidden" id="attendanceUserId">
+        
+        <!-- Nil Excluded Modal Warning Banner -->
+        <div id="modalNilDietWarning" class="message message-danger" style="display: none; margin-bottom: 1.5rem; border-left: 5px solid var(--error);">
+          🛑 This member has an active approved Nil Diet Request for this date. Modifying attendance is locked.
+        </div>
+        
+        <div class="form-group">
+          <label for="adminAttendanceDate" class="form-label">Date</label>
+          <input type="text" id="adminAttendanceDate" class="form-input" required placeholder="Select Date">
+        </div>
+        
+        <div style="margin: 1.5rem 0; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; border: 1.5px solid var(--glass-border); text-align: center; vertical-align: middle;">
+            <thead>
+              <tr style="background: rgba(29, 78, 216, 0.015); border-bottom: 2px solid var(--glass-border);">
+                <th style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 700; border-right: 1.5px solid var(--glass-border); color: #ffffff !important; text-transform: uppercase; letter-spacing: 0.05em;">MEAL TYPE</th>
+                <th style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 700; border-right: 1.5px solid var(--glass-border); color: #ffffff !important; text-transform: uppercase; letter-spacing: 0.05em;">MORNING</th>
+                <th style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 700; color: #ffffff !important; text-transform: uppercase; letter-spacing: 0.05em;">EVENING</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1.5px solid var(--glass-border);">
+                <td style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--accent-light); border-right: 1.5px solid var(--glass-border); letter-spacing: 0.03em;">NORMAL DIET</td>
+                <td style="padding: 0.85rem; text-align: center; border-right: 1.5px solid var(--glass-border); vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendMorningNormal" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+                <td style="padding: 0.85rem; text-align: center; vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendEveningNormal" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+              </tr>
+              <tr style="border-bottom: 1.5px solid var(--glass-border);">
+                <td style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--accent-light); border-right: 1.5px solid var(--glass-border); letter-spacing: 0.03em;">HALF SPECIAL</td>
+                <td style="padding: 0.85rem; text-align: center; border-right: 1.5px solid var(--glass-border); vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendMorningHalfSpecial" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+                <td style="padding: 0.85rem; text-align: center; vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendEveningHalfSpecial" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+              </tr>
+              <tr style="border-bottom: none;">
+                <td style="padding: 0.85rem; text-align: center; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--accent-light); border-right: 1.5px solid var(--glass-border); letter-spacing: 0.03em;">FULL SPECIAL</td>
+                <td style="padding: 0.85rem; text-align: center; border-right: 1.5px solid var(--glass-border); vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendMorningFullSpecial" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+                <td style="padding: 0.85rem; text-align: center; vertical-align: middle;">
+                  <input type="checkbox" id="adminAttendEveningFullSpecial" style="width: 1.35rem; height: 1.35rem; cursor: pointer; accent-color: var(--accent-color); vertical-align: middle;">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeMarkAttendanceModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Log Attendance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MEMBER EDIT MODAL -->
+  <div class="overlay" id="editUserOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Edit Member Settings</h3>
+      <form id="editUserForm">
+        <input type="hidden" id="editUserId">
+        <div class="form-group">
+          <label for="editFullName" class="form-label">Full Name</label>
+          <input type="text" id="editFullName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label for="editEmail" class="form-label">Email Address</label>
+          <input type="email" id="editEmail" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label for="selectUserStatus" class="form-label">Dining Access</label>
+          <select id="selectUserStatus">
+            <option value="active">Permitted / Active</option>
+            <option value="inactive">Suspended / Inactive</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeEditUserModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Update Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENT MODAL -->
+  <div class="overlay" id="noticeOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Post Notice Announcement</h3>
+      <form id="noticeForm">
+        <div class="form-group">
+          <label for="inputNoticeTitle" class="form-label">Announcement Title</label>
+          <input type="text" id="inputNoticeTitle" class="form-input" placeholder="e.g. Mess timings changed for Holi" required>
+        </div>
+        <div class="form-group">
+          <label for="inputNoticeContent" class="form-label">Content Description</label>
+          <textarea id="inputNoticeContent" class="form-input" rows="4" placeholder="Type details..." required></textarea>
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeNoticeModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Publish Notice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MENU EDIT MODAL -->
+  <div class="overlay" id="editMenuOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;" id="editMenuDayName">Modify Menu for Day</h3>
+      <form id="editMenuForm">
+        <input type="hidden" id="editMenuDayId">
+         <div style="display: flex; flex-direction: column; gap: 1rem;">
+           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 1rem;">
+             <div class="form-group">
+               <label for="editMenuMorningNormal" class="form-label" style="color: var(--accent-light);">Morning Normal</label>
+               <input type="text" id="editMenuMorningNormal" class="form-input" required>
+             </div>
+             <div class="form-group">
+               <label for="editMenuEveningNormal" class="form-label" style="color: var(--accent-light);">Evening Normal</label>
+               <input type="text" id="editMenuEveningNormal" class="form-input" required>
+             </div>
+           </div>
+           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 1rem;">
+             <div class="form-group">
+               <label for="editMenuMorningHalfSpecial" class="form-label" style="color: var(--accent-light);">Morning HalfSpecial</label>
+               <input type="text" id="editMenuMorningHalfSpecial" class="form-input" required>
+             </div>
+             <div class="form-group">
+               <label for="editMenuEveningHalfSpecial" class="form-label" style="color: var(--accent-light);">Evening HalfSpecial</label>
+               <input type="text" id="editMenuEveningHalfSpecial" class="form-input" required>
+             </div>
+           </div>
+           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+             <div class="form-group">
+               <label for="editMenuMorningFullSpecial" class="form-label" style="color: var(--accent-light);">Morning FullSpecial</label>
+               <input type="text" id="editMenuMorningFullSpecial" class="form-input" required>
+             </div>
+             <div class="form-group">
+               <label for="editMenuEveningFullSpecial" class="form-label" style="color: var(--accent-light);">Evening FullSpecial</label>
+               <input type="text" id="editMenuEveningFullSpecial" class="form-input" required>
+             </div>
+           </div>
+         </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeEditMenuModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RECORD PAYMENT MODAL -->
+  <div class="overlay" id="recordPaymentOverlay">
+    <div class="modal">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Mark Bill as Paid</h3>
+      <form id="recordPaymentForm">
+        <input type="hidden" id="paymentBillId">
+        <div class="form-group">
+          <label for="paymentMode" class="form-label">Payment Mode</label>
+          <select id="paymentMode" required>
+            <option value="Cash">Cash</option>
+            <option value="Online">Online</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="paymentTransactionId" class="form-label">Transaction ID (Optional)</label>
+          <input type="text" id="paymentTransactionId" class="form-input" placeholder="e.g. TXN10283921">
+        </div>
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-accent" onclick="closeRecordPaymentModal()" style="flex: 1;">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Confirm Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 Mess Management System. District Administrative suite. All rights reserved.</p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,15 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const attendanceController = require('../controllers/attendanceController');
-const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
+const { authenticate, requireAdmin } = require('../middleware/authMiddleware');
 
-// Log daily meal attendance choices (personnel)
-router.post('/', authenticateToken, attendanceController.markAttendance);
+// Submit meal attendance logs (Admin only)
+router.post('/', authenticate, requireAdmin, attendanceController.markAttendance);
 
-// Retrieve personal attendance history (personnel)
-router.get('/history', authenticateToken, attendanceController.getAttendanceHistory);
+// Retrieve personal attendance logs history
+router.get('/history', authenticate, attendanceController.getAttendanceHistory);
 
-// Get total meal count summary (Admin only)
-router.get('/summary', authenticateToken, requireRole('Admin'), attendanceController.getDailyAttendanceSummary);
+// Retrieve aggregate daily counts (Admin only)
+router.get('/summary', authenticate, requireAdmin, attendanceController.getDailyAttendanceSummary);
+
+// Retrieve attendance history for a specific member (Admin only)
+router.get('/member/:userId', authenticate, requireAdmin, attendanceController.getMemberAttendanceHistory);
 
 module.exports = router;

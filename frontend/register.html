@@ -1,105 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UP Police Mess Management - Register</title>
-  <meta name="description" content="Register as a police officer to access the Uttar Pradesh Police Mess.">
-  <link rel="stylesheet" href="style.css">
+  <title>Personnel Signup - Mess Management</title>
+  <meta name="description" content="Sign up for the Mess Management Portal.">
+  <link rel="stylesheet" href="style.css?v=1.2">
 </head>
+
 <body>
 
   <!-- Navigation Header -->
   <header>
     <nav class="navbar" aria-label="Main Navigation">
-      <div class="nav-brand">UP POLICE MESS MANAGEMENT</div>
+      <div class="nav-brand">MESS PORTAL SIGNUP</div>
     </nav>
   </header>
 
   <!-- Main Body Content -->
   <main>
     <section class="glass-panel form-card" style="max-width: 600px; margin: 2rem auto;">
-      <h2>Personnel Signup</h2>
+      <h2>Mess Personnel Signup</h2>
       <p class="subtitle">Enter details and verify your email to create a mess registration account</p>
 
       <form id="registrationForm" novalidate>
-        
+
         <!-- Name Field -->
         <div class="form-group">
           <label for="inputName" class="form-label">Full Name</label>
           <div class="input-container">
             <input type="text" id="inputName" class="form-input" placeholder="e.g. ASHWANI GUPTA" required>
             <button type="button" class="mic-btn" id="btnMicName" title="Dictate Name" aria-label="Dictate Name">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
             </button>
           </div>
         </div>
 
-        <!-- PNO Field (Personal Number) -->
+        <!-- District Selection Field (Loaded dynamically) -->
         <div class="form-group">
-          <label for="inputPNO" class="form-label">Personal Number (PNO)</label>
-          <div class="input-container">
-            <input type="text" id="inputPNO" class="form-input" placeholder="e.g. 1859666" required>
-            <button type="button" class="mic-btn" id="btnMicPNO" title="Dictate PNO" aria-label="Dictate Personal Number">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Rank Field (Dropdown) -->
-        <div class="form-group">
-          <label for="selectRank" class="form-label">Designation / Rank</label>
-          <select id="selectRank" required>
-            <option value="" disabled selected>Select Police Rank</option>
-            <option value="Constable">Constable</option>
-            <option value="Head Constable">Head Constable</option>
-            <option value="Sub-Inspector">Sub-Inspector</option>
-            <option value="Inspector">Inspector</option>
-            <option value="Mess Staff">Mess Staff</option>
-            <option value="Admin">Admin / Mess In-Charge</option>
+          <label for="selectDistrict" class="form-label">Select Mess / District</label>
+          <select id="selectDistrict" required>
+            <option value="" disabled selected>Loading active districts...</option>
           </select>
-        </div>
-
-        <!-- Posting Unit Field -->
-        <div class="form-group">
-          <label for="inputPostingUnit" class="form-label">Posting Unit / Station</label>
-          <input type="text" id="inputPostingUnit" class="form-input" placeholder="e.g. Civil Lines Police Station / PAC 35 Bn" required>
-        </div>
-
-        <!-- Mobile Field -->
-        <div class="form-group">
-          <label for="inputMobile" class="form-label">Mobile Number</label>
-          <div class="input-container">
-            <input type="tel" id="inputMobile" class="form-input" placeholder="e.g. 8090467395" required>
-            <button type="button" class="mic-btn" id="btnMicMobile" title="Dictate Mobile" aria-label="Dictate Mobile Number">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-            </button>
-          </div>
         </div>
 
         <!-- Email Field & Send OTP trigger -->
         <div class="form-group">
-          <label for="inputEmail" class="form-label">Authorized Email Address</label>
+          <label for="inputEmail" class="form-label">Email Address</label>
           <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
             <div class="input-container" style="flex: 1;">
-              <input type="email" id="inputEmail" class="form-input" placeholder="e.g. vicky.nick1991@gmail.com" required>
+              <input type="email" id="inputEmail" class="form-input" placeholder="e.g. user@copash.shop" required>
             </div>
-            <button type="button" id="btnSendOtp" class="btn btn-accent">Get OTP</button>
+            <button type="button" id="btnSendOtp" class="btn btn-accent" style="padding: 0 1.25rem;">Get OTP</button>
           </div>
-          <span style="font-size: 0.8rem; color: var(--text-secondary);">An email verified on the database whitelist is required.</span>
+          <span style="font-size: 0.8rem; color: var(--text-secondary);">An OTP code will be sent to this email address
+            for verification.</span>
         </div>
 
         <!-- Password Field -->
         <div class="form-group">
           <label for="inputPassword" class="form-label">Create Login Password</label>
-          <input type="password" id="inputPassword" class="form-input" placeholder="Create secure password" required>
+          <input type="password" id="inputPassword" class="form-input" placeholder="Min 6 characters" required>
         </div>
 
         <!-- OTP Verification Block -->
-        <div id="otpSection" class="otp-section" style="display: none;">
+        <div id="otpSection" class="otp-section"
+          style="display: none; border-top: 1px solid var(--glass-border); padding-top: 1.5rem; margin-top: 1.5rem;">
           <div class="form-group">
             <label for="inputOtp" class="form-label">Verification OTP Code</label>
-            <input type="text" id="inputOtp" class="form-input" maxlength="6" placeholder="Enter 6-digit OTP code" required>
+            <input type="text" id="inputOtp" class="form-input" maxlength="6" placeholder="Enter 6-digit code" required>
           </div>
           <button type="submit" id="btnRegister" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
             Verify OTP & Submit Record
@@ -107,21 +82,23 @@
         </div>
 
         <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
-          <span style="color: var(--text-secondary);">Already registered?</span> 
-          <a href="login.html" style="color: var(--secondary-color); font-weight: 600; text-decoration: none;">Log In Here</a>
+          <span style="color: var(--text-secondary);">Already registered?</span>
+          <a href="login.html" style="color: var(--accent-light); font-weight: 600; text-decoration: none;">Log In
+            Here</a>
         </div>
 
         <!-- Dynamic alert messages -->
-        <div id="statusMessage" class="message" style="display: none; margin-top: 1.5rem;" role="alert"></div>
+        <div id="statusMessage" class="message" style="margin-top: 1.5rem;" role="alert"></div>
       </form>
     </section>
   </main>
 
   <!-- Sticky Footer -->
   <footer>
-    <p>&copy; 2026 Uttar Pradesh Police Mess Management. Built with Antigravity IDE. All rights reserved.</p>
+    <p>&copy; 2026 Mess Management System. Built with Antigravity IDE. All rights reserved.</p>
   </footer>
 
   <script src="app.js"></script>
 </body>
+
 </html>
