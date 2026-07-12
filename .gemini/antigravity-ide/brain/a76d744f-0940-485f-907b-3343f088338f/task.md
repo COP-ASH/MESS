@@ -1,0 +1,25 @@
+# Implementation Checklist
+
+- [x] Create/Update Database Schema & Configs
+  - [x] Write `backend/src/db/schema.js` with new district and user structure
+  - [x] Run migrations and database schema generation (`drizzle-kit generate` or schema generation command)
+- [x] Implement Backend Modular structure
+  - [x] Build config files & helpers (`backend/src/config/`, `backend/src/utils/`)
+  - [x] Build authentication & role middleware (`backend/src/middleware/`)
+  - [x] Build request validators using Zod (`backend/src/validators/`)
+  - [x] Create email templates & service with Resend (`backend/src/emails/`)
+  - [x] Implement repositories (`backend/src/repositories/`)
+  - [x] Implement services (`backend/src/services/`)
+  - [x] Build controllers & routes (`backend/src/controllers/`, `backend/src/routes/`)
+  - [x] Update `backend/app.js` and `backend/server.js`
+- [x] Build and Style Frontend Dashboards
+  - [x] Restyle `frontend/style.css` with premium glassmorphic UI
+  - [x] Update login & registration forms to support districts & OTP flow
+  - [x] Rebuild Super Admin dashboard HTML & features
+  - [x] Rebuild District Admin dashboard HTML & features
+  - [x] Update Simple User/Personnel dashboard HTML & features
+  - [x] Rewrite `frontend/app.js` logic to integrate with the new APIs and role workflows
+- [/] Verify System Flow
+  - [/] Run server locally & verify DB operations (Pending database connection resolution)
+  - [/] Test auth flow (registration -> OTP email -> login)
+  - [/] Test role isolation & CRUD operations for each dashboard
