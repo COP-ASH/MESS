@@ -1336,3 +1336,594 @@ body.auth-page footer {
   font-weight: 700;
   border-right: 2px solid var(--glass-border) !important;
 }
+
+/* ==========================================================================
+   MOBILE RESPONSIVE DESIGN (max-width: 767px)
+   Ensures the site works beautifully on Android & iOS phones
+   ========================================================================== */
+
+@media (max-width: 767px) {
+
+  /* --- Override Desktop Dashboard Lock --- */
+  body.dashboard-page {
+    height: auto !important;
+    overflow: auto !important;
+    min-height: 100vh;
+  }
+
+  body.dashboard-page main {
+    overflow: visible !important;
+    padding: 0.6rem !important;
+    min-height: auto;
+  }
+
+  body.dashboard-page .tab-content.active {
+    display: block !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  body.dashboard-page .tab-content.active > .glass-panel {
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  body.dashboard-page .tab-content.active > .glass-panel .table-responsive {
+    max-height: 400px !important;
+  }
+
+  /* --- Header / Navbar --- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .navbar {
+    flex-direction: column;
+    padding: 0.75rem 1rem !important;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .nav-brand {
+    font-size: 1rem !important;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    flex-direction: row !important;
+    justify-content: center;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap;
+  }
+
+  .nav-links li {
+    font-size: 0.75rem !important;
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+
+  #userGreeting {
+    font-size: 0.75rem !important;
+    text-align: center;
+    width: 100%;
+    order: 1;
+  }
+
+  #currentTimeDisplay {
+    font-size: 0.7rem !important;
+    order: 2;
+  }
+
+  .nav-links li:has(#btnLogout) {
+    order: 3;
+  }
+
+  #btnLogout {
+    padding: 0.25rem 0.6rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* --- Tab Navigation (Horizontal Scroll) --- */
+  .tab-container {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 0.35rem !important;
+    padding: 0.35rem 0.5rem !important;
+    margin-bottom: 0.75rem !important;
+    justify-content: flex-start !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .tab-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    font-size: 0.72rem !important;
+    padding: 0.45rem 0.7rem !important;
+    white-space: nowrap;
+  }
+
+  /* --- Main Content Area --- */
+  main {
+    padding: 0.6rem !important;
+  }
+
+  /* --- Glass Panels --- */
+  .glass-panel {
+    padding: 1rem !important;
+    border-radius: var(--radius-md) !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .glass-panel h3 {
+    font-size: 1rem !important;
+  }
+
+  /* --- Dashboard Grid / Stat Cards --- */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .stat-card {
+    padding: 0.75rem 0.5rem !important;
+  }
+
+  .stat-card h3 {
+    font-size: 0.65rem !important;
+    letter-spacing: 0.3px;
+  }
+
+  .stat-card .value {
+    font-size: 1.5rem !important;
+  }
+
+  .stat-card .trend {
+    font-size: 0.7rem !important;
+  }
+
+  /* Attendance summary stat cards - even more compact on mobile */
+  #tabAttendance .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.4rem !important;
+  }
+
+  #tabAttendance .stat-card {
+    padding: 0.5rem 0.25rem !important;
+  }
+
+  #tabAttendance .stat-card h3 {
+    font-size: 0.6rem !important;
+    line-height: 1.15 !important;
+  }
+
+  #tabAttendance .stat-card .value {
+    font-size: 1.2rem !important;
+  }
+
+  /* --- Tables --- */
+  .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-sm);
+  }
+
+  table {
+    font-size: 0.78rem !important;
+    min-width: 500px;
+  }
+
+  th {
+    padding: 0.6rem 0.5rem !important;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.55rem 0.5rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* Allow text wrapping in menu columns on mobile */
+  #tabMenu td,
+  #tabMemberMenu td {
+    white-space: normal !important;
+    word-break: break-word;
+    min-width: 100px;
+  }
+
+  #tabMenu td:first-child,
+  #tabMemberMenu td:first-child {
+    min-width: 70px !important;
+  }
+
+  /* Compact action buttons in tables */
+  table .btn {
+    padding: 0.2rem 0.45rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* --- Forms & Inputs --- */
+  .form-input,
+  select,
+  textarea {
+    padding: 0.7rem 1rem !important;
+    font-size: 0.9rem !important;
+  }
+
+  .form-label {
+    font-size: 0.78rem !important;
+  }
+
+  .form-group {
+    margin-bottom: 1rem !important;
+  }
+
+  .btn {
+    padding: 0.7rem 1.25rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* --- Modals --- */
+  .modal {
+    width: 95% !important;
+    max-width: none !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 1.25rem !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .modal h3 {
+    font-size: 1.15rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Modal button rows */
+  .modal div[style*="display: flex"][style*="gap"] {
+    flex-direction: column;
+  }
+
+  /* --- Toast Notifications --- */
+  #statusMessage,
+  #resetStatusMessage {
+    width: 92% !important;
+    max-width: none !important;
+    font-size: 0.9rem !important;
+    padding: 1.1rem 1.25rem 1.1rem 3.5rem !important;
+  }
+
+  /* --- Charts --- */
+  .chart-card {
+    min-height: 220px !important;
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .chart-card h3 {
+    font-size: 0.9rem !important;
+  }
+
+  /* Charts container grid */
+  div[style*="grid-template-columns"][style*="chart"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* --- Login / Split Layout Adjustments --- */
+  .right-panel {
+    padding: 2rem 1.25rem !important;
+  }
+
+  .login-box {
+    max-width: 100% !important;
+  }
+
+  .login-box h2 {
+    font-size: 1.75rem !important;
+  }
+
+  .form-desc {
+    font-size: 0.85rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .brand-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .brand-title {
+    font-size: 0.9rem !important;
+  }
+
+  .brand-subtitle {
+    font-size: 0.7rem !important;
+  }
+
+  .brand-logo-img {
+    width: 28px !important;
+  }
+
+  /* --- Footer --- */
+  footer {
+    padding: 0.6rem 1rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* --- Notice Cards --- */
+  .notice-card {
+    padding: 1rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .notice-icon-pulse {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  /* --- Badges --- */
+  .badge {
+    font-size: 0.65rem !important;
+    padding: 0.2rem 0.5rem !important;
+  }
+
+  /* --- Inline style grid overrides for HTML grids --- */
+  /* District info / announcements grid */
+  div[style*="grid-template-columns: repeat(auto-fit"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Bills & Rates side-by-side panels */
+  #tabBills > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Flex row buttons to stack vertically */
+  div[style*="display: flex"][style*="gap: 1rem"] > .btn {
+    width: 100%;
+  }
+
+  /* --- Attendance Modal Checkbox Table --- */
+  #adminAttendanceForm table {
+    min-width: auto !important;
+  }
+
+  #adminAttendanceForm th,
+  #adminAttendanceForm td {
+    padding: 0.6rem 0.4rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  #adminAttendanceForm input[type="checkbox"] {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+  }
+
+  /* --- Weekly menu edit modal form --- */
+  #editMenuForm .form-group {
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* --- Nil Diet tab tables and forms --- */
+  #tabNilDietsAdmin .table-responsive,
+  #tabNilDiet .table-responsive {
+    max-height: 350px !important;
+  }
+
+  /* --- Reports tab adjustments --- */
+  #tabReports .glass-panel {
+    padding: 0.75rem !important;
+  }
+
+  /* --- Profile / Password tab forms --- */
+  #tabProfile .form-card,
+  #tabPassword .form-card {
+    max-width: 100% !important;
+  }
+
+  /* --- Misc inline style overrides --- */
+  /* Elements with inline max-height or fixed dimensions */
+  div[style*="max-height: 350px"] {
+    max-height: 250px !important;
+  }
+
+  /* Inline flex wrapping helpers */
+  div[style*="display: flex"][style*="flex-wrap: wrap"] {
+    gap: 0.5rem !important;
+  }
+
+  /* Filter/date row controls */
+  div[style*="display: flex"][style*="align-items: center"] > input[type="text"],
+  div[style*="display: flex"][style*="align-items: center"] > .form-input {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Compact filter rows */
+  #tabAttendance div[style*="display: flex"][style*="justify-content: space-between"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  /* --- Auth / Login Page Mobile --- */
+  body.auth-page {
+    height: auto !important;
+    overflow: auto !important;
+    min-height: 100vh;
+  }
+
+  .split-container {
+    min-height: 100vh;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .right-panel {
+    overflow: visible !important;
+    min-height: 100vh;
+  }
+}
+
+/* ==========================================================================
+   EXTRA SMALL DEVICES (max-width: 374px) — iPhone SE / older small phones
+   ========================================================================== */
+
+@media (max-width: 374px) {
+
+  .nav-brand {
+    font-size: 0.85rem !important;
+  }
+
+  .tab-btn {
+    font-size: 0.65rem !important;
+    padding: 0.35rem 0.55rem !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stat-card .value {
+    font-size: 1.25rem !important;
+  }
+
+  .modal {
+    padding: 1rem !important;
+  }
+
+  table {
+    font-size: 0.72rem !important;
+  }
+
+  th {
+    font-size: 0.62rem !important;
+  }
+
+  .glass-panel {
+    padding: 0.75rem !important;
+  }
+}
+
+/* ==========================================================================
+   TABLET PORTRAIT (768px - 1024px)
+   ========================================================================== */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+
+  .navbar {
+    padding: 1rem 1.25rem !important;
+  }
+
+  .nav-brand {
+    font-size: 1.15rem !important;
+  }
+
+  .tab-container {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem !important;
+    justify-content: flex-start !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .tab-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex-shrink: 0;
+    font-size: 0.8rem !important;
+    white-space: nowrap;
+  }
+
+  main {
+    padding: 1rem !important;
+  }
+
+  .glass-panel {
+    padding: 1.25rem !important;
+  }
+
+  table {
+    font-size: 0.82rem !important;
+  }
+}
+
+/* ==========================================================================
+   TOUCH DEVICE ENHANCEMENTS
+   ========================================================================== */
+
+@media (hover: none) and (pointer: coarse) {
+
+  /* Larger touch targets for interactive elements */
+  .btn {
+    min-height: 44px;
+  }
+
+  .tab-btn {
+    min-height: 40px;
+  }
+
+  input[type="checkbox"] {
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  /* Remove hover effects that don't work on touch */
+  .glass-panel:hover {
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .stat-card[onclick]:hover {
+    transform: none;
+  }
+
+  .notice-card:hover {
+    transform: none;
+    box-shadow: 0 8px 24px 0 rgba(255, 74, 90, 0.05);
+  }
+
+  /* Disable btn hover transform on touch */
+  .btn-primary:hover,
+  .btn-danger:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   iOS SAFE AREA INSETS (notch / home indicator)
+   ========================================================================== */
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body.dashboard-page {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  header {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  footer {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  .modal {
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+}
