@@ -50,7 +50,7 @@ const sessions = pgTable('sessions', {
 // 5. Activity/Audit Logs table
 const activityLogs = pgTable('activity_logs', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   action: text('action').notNull(),
   details: text('details'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -62,7 +62,7 @@ const reports = pgTable('reports', {
   title: text('title').notNull(),
   type: text('type').notNull(), // 'district', 'user', 'registration', 'login', etc.
   data: text('data'), // JSON string containing metrics/analytics
-  createdBy: integer('created_by').references(() => users.id),
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -92,7 +92,7 @@ const messMenu = pgTable('mess_menu', {
 // 9. Meal Attendance table (District scoped)
 const mealAttendance = pgTable('meal_attendance', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   districtId: integer('district_id').references(() => districts.id).notNull(),
   date: date('date').notNull(),
   morningNormal: boolean('morning_normal').default(false).notNull(),
@@ -107,7 +107,7 @@ const mealAttendance = pgTable('meal_attendance', {
 // 10. Monthly Bills table (District scoped)
 const monthlyBills = pgTable('monthly_bills', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   districtId: integer('district_id').references(() => districts.id).notNull(),
   month: integer('month').notNull(), // 1 - 12
   year: integer('year').notNull(),
@@ -121,7 +121,7 @@ const monthlyBills = pgTable('monthly_bills', {
 const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
   billId: integer('bill_id').references(() => monthlyBills.id).notNull(),
-  userId: integer('user_id').references(() => users.id).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   districtId: integer('district_id').references(() => districts.id).notNull(),
   amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
   paymentMode: text('payment_mode').notNull(), // 'Cash', 'Online'
@@ -135,14 +135,14 @@ const notices = pgTable('notices', {
   districtId: integer('district_id').references(() => districts.id).notNull(),
   title: text('title').notNull(),
   content: text('content').notNull(),
-  postedBy: integer('posted_by').references(() => users.id).notNull(),
+  postedBy: integer('posted_by').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // 13. Nil Diet Requests table (District scoped)
 const nilDietRequests = pgTable('nil_diet_requests', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   districtId: integer('district_id').references(() => districts.id).notNull(),
   fromDate: date('from_date').notNull(),
   toDate: date('to_date').notNull(),
