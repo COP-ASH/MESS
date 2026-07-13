@@ -27,7 +27,11 @@ async function seedDatabase() {
     await db.execute(require('drizzle-orm').sql`
       ALTER TABLE nil_diet_requests
       ADD COLUMN IF NOT EXISTS morning_diet BOOLEAN DEFAULT true NOT NULL,
-      ADD COLUMN IF NOT EXISTS evening_diet BOOLEAN DEFAULT true NOT NULL;
+      ADD COLUMN IF NOT EXISTS evening_diet BOOLEAN DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS from_morning BOOLEAN DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS from_evening BOOLEAN DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS to_morning BOOLEAN DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS to_evening BOOLEAN DEFAULT true NOT NULL;
     `);
 
     // 1. Seed Settings if empty

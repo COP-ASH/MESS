@@ -1527,8 +1527,9 @@ async function fetchAndSetAdminAttendance(userId, date) {
         date <= r.toDate.split('T')[0]
       );
       if (matched) {
-        isMorningNil = !!matched.morningDiet;
-        isEveningNil = !!matched.eveningDiet;
+        const nilStatus = checkNilStatusForDate(date, matched);
+        isMorningNil = nilStatus.isMorning;
+        isEveningNil = nilStatus.isEvening;
       }
     }
   } catch (err) {
@@ -1780,18 +1781,53 @@ function initPersonnelDashboard() {
   // Nil diet request submit
   const nilDietForm = document.getElementById('nilDietForm');
   if (nilDietForm) {
+    const nilFromDateInput = document.getElementById('nilFromDate');
+    const nilToDateInput = document.getElementById('nilToDate');
+    const nilFromMorning = document.getElementById('nilFromMorning');
+    const nilFromEvening = document.getElementById('nilFromEvening');
+    const nilToMorning = document.getElementById('nilToMorning');
+    const nilToEvening = document.getElementById('nilToEvening');
+
+    function syncSameDaySessions() {
+      if (nilFromDateInput && nilToDateInput && nilFromDateInput.value === nilToDateInput.value && nilFromDateInput.value !== '') {
+        nilToMorning.checked = nilFromMorning.checked;
+        nilToEvening.checked = nilFromEvening.checked;
+      }
+    }
+
+    if (nilFromMorning) nilFromMorning.addEventListener('change', syncSameDaySessions);
+    if (nilFromEvening) nilFromEvening.addEventListener('change', syncSameDaySessions);
+    if (nilToMorning) {
+      nilToMorning.addEventListener('change', () => {
+        if (nilFromDateInput && nilToDateInput && nilFromDateInput.value === nilToDateInput.value && nilFromDateInput.value !== '') {
+          nilFromMorning.checked = nilToMorning.checked;
+        }
+      });
+    }
+    if (nilToEvening) {
+      nilToEvening.addEventListener('change', () => {
+        if (nilFromDateInput && nilToDateInput && nilFromDateInput.value === nilToDateInput.value && nilFromDateInput.value !== '') {
+          nilFromEvening.checked = nilToEvening.checked;
+        }
+      });
+    }
+    if (nilFromDateInput) nilFromDateInput.addEventListener('change', syncSameDaySessions);
+    if (nilToDateInput) nilToDateInput.addEventListener('change', syncSameDaySessions);
+
     nilDietForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const fromDate = document.getElementById('nilFromDate').value;
-      const toDate = document.getElementById('nilToDate').value;
-      const morningDiet = document.getElementById('nilMorningDiet').checked;
-      const eveningDiet = document.getElementById('nilEveningDiet').checked;
+      const fromDate = nilFromDateInput.value;
+      const toDate = nilToDateInput.value;
+      const fromMorning = nilFromMorning.checked;
+      const fromEvening = nilFromEvening.checked;
+      const toMorning = nilToMorning.checked;
+      const toEvening = nilToEvening.checked;
 
       try {
         const response = await fetch(`${BACKEND_BASE_URL}/api/nildiet`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ fromDate, toDate, morningDiet, eveningDiet })
+          body: JSON.stringify({ fromDate, toDate, fromMorning, fromEvening, toMorning, toEvening })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Failed to submit nil diet request.');
@@ -1807,6 +1843,31 @@ function initPersonnelDashboard() {
 
   // Load Member Nil Diet requests history
   loadMemberNilDietRequests();
+}
+
+function checkNilStatusForDate(dateStr, request) {
+  const date = dateStr;
+  const start = request.fromDate.split('T')[0];
+  const end = request.toDate.split('T')[0];
+
+  // Fallback for legacy requests
+  if (request.fromMorning === undefined || request.fromMorning === null) {
+    if (date >= start && date <= end) {
+      return { isMorning: !!request.morningDiet, isEvening: !!request.eveningDiet };
+    }
+    return { isMorning: false, isEvening: false };
+  }
+
+  if (date === start && date === end) {
+    return { isMorning: !!request.fromMorning, isEvening: !!request.fromEvening };
+  } else if (date === start) {
+    return { isMorning: !!request.fromMorning, isEvening: !!request.fromEvening };
+  } else if (date === end) {
+    return { isMorning: !!request.toMorning, isEvening: !!request.toEvening };
+  } else if (date > start && date < end) {
+    return { isMorning: true, isEvening: true };
+  }
+  return { isMorning: false, isEvening: false };
 }
 
 function getEarliestAllowedNilDietDate() {
@@ -2270,8 +2331,13 @@ async function loadMemberAttendanceHistory() {
           return dateStr >= start && dateStr <= end;
         });
 
-        const isMorningNil = matchedNil ? !!matchedNil.morningDiet : false;
-        const isEveningNil = matchedNil ? !!matchedNil.eveningDiet : false;
+        let isMorningNil = false;
+        let isEveningNil = false;
+        if (matchedNil) {
+          const nilStatus = checkNilStatusForDate(dateStr, matchedNil);
+          isMorningNil = nilStatus.isMorning;
+          isEveningNil = nilStatus.isEvening;
+        }
 
         // Find record
         const record = history.find(r => r.date.split('T')[0] === dateStr);
@@ -2374,9 +2440,20 @@ async function loadMemberNilDietRequests() {
         const displayFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`;
         const displayTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`;
 
-        const sessionsStr = (r.morningDiet && r.eveningDiet) 
-          ? 'Morning & Evening' 
-          : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+        let sessionsStr = '';
+        if (r.fromMorning !== undefined && r.fromMorning !== null) {
+          const fromSess = (r.fromMorning && r.fromEvening) ? 'Morning & Evening' : (r.fromMorning ? 'Morning Only' : (r.fromEvening ? 'Evening Only' : 'None'));
+          const toSess = (r.toMorning && r.toEvening) ? 'Morning & Evening' : (r.toMorning ? 'Morning Only' : (r.toEvening ? 'Evening Only' : 'None'));
+          if (r.fromDate.split('T')[0] === r.toDate.split('T')[0]) {
+            sessionsStr = fromSess;
+          } else {
+            sessionsStr = `Start: ${fromSess}<br>End: ${toSess}`;
+          }
+        } else {
+          sessionsStr = (r.morningDiet && r.eveningDiet) 
+            ? 'Morning & Evening' 
+            : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+        }
 
         const deleteButtonHtml = r.status === 'pending'
           ? `<button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteNilDietRequest(${r.id})">Delete</button>`
@@ -2450,9 +2527,20 @@ async function loadNilDietRequestsAdmin() {
         const displayFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`;
         const displayTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`;
 
-        const sessionsStr = (r.morningDiet && r.eveningDiet) 
-          ? 'Morning & Evening' 
-          : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+        let sessionsStr = '';
+        if (r.fromMorning !== undefined && r.fromMorning !== null) {
+          const fromSess = (r.fromMorning && r.fromEvening) ? 'Morning & Evening' : (r.fromMorning ? 'Morning Only' : (r.fromEvening ? 'Evening Only' : 'None'));
+          const toSess = (r.toMorning && r.toEvening) ? 'Morning & Evening' : (r.toMorning ? 'Morning Only' : (r.toEvening ? 'Evening Only' : 'None'));
+          if (r.fromDate.split('T')[0] === r.toDate.split('T')[0]) {
+            sessionsStr = fromSess;
+          } else {
+            sessionsStr = `Start: ${fromSess}<br>End: ${toSess}`;
+          }
+        } else {
+          sessionsStr = (r.morningDiet && r.eveningDiet) 
+            ? 'Morning & Evening' 
+            : (r.morningDiet ? 'Morning Only' : (r.eveningDiet ? 'Evening Only' : 'None'));
+        }
 
         let actionHtml = '';
         if (r.status === 'pending') {

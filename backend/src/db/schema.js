@@ -148,6 +148,10 @@ const nilDietRequests = pgTable('nil_diet_requests', {
   toDate: date('to_date').notNull(),
   morningDiet: boolean('morning_diet').default(true).notNull(),
   eveningDiet: boolean('evening_diet').default(true).notNull(),
+  fromMorning: boolean('from_morning').default(true).notNull(),
+  fromEvening: boolean('from_evening').default(true).notNull(),
+  toMorning: boolean('to_morning').default(true).notNull(),
+  toEvening: boolean('to_evening').default(true).notNull(),
   status: text('status').default('pending').notNull(), // 'pending', 'approved', 'rejected'
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

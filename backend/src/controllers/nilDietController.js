@@ -3,22 +3,73 @@ const { nilDietRequests, users, mealAttendance, districts } = require('../db/sch
 const { eq, and, sql } = require('drizzle-orm');
 const { logAudit } = require('../utils/logger');
 
+// Date-specific Nil check helper function
+function formatDateStr(d) {
+  if (!d) return '';
+  if (typeof d === 'string') {
+    const parts = d.split('T')[0].split('-');
+    if (parts.length === 3) {
+      return `${parts[0]}-${parts[1]}-${parts[2]}`;
+    }
+  }
+  const dateObj = new Date(d);
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function checkNilStatusForDate(dateStr, request) {
+  const date = formatDateStr(dateStr);
+  const from = formatDateStr(request.fromDate);
+  const to = formatDateStr(request.toDate);
+
+  let isMorningNil = false;
+  let isEveningNil = false;
+
+  // Fallback for legacy requests (where new columns are null/undefined)
+  if (request.fromMorning === undefined || request.fromMorning === null) {
+    if (date >= from && date <= to) {
+      isMorningNil = !!request.morningDiet;
+      isEveningNil = !!request.eveningDiet;
+    }
+    return { isMorningNil, isEveningNil };
+  }
+
+  if (date === from && date === to) {
+    isMorningNil = !!request.fromMorning;
+    isEveningNil = !!request.fromEvening;
+  } else if (date === from) {
+    isMorningNil = !!request.fromMorning;
+    isEveningNil = !!request.fromEvening;
+  } else if (date === to) {
+    isMorningNil = !!request.toMorning;
+    isEveningNil = !!request.toEvening;
+  } else if (date > from && date < to) {
+    isMorningNil = true;
+    isEveningNil = true;
+  }
+
+  return { isMorningNil, isEveningNil };
+}
+
 /**
  * Submit a Nil Diet Request (Member only)
  */
 async function submitRequest(req, res, next) {
   console.log('>>> [CONTROLLER ENTRY] nilDietController.submitRequest - Params:', req.body);
-  const { fromDate, toDate } = req.body;
   try {
-    const { fromDate, toDate, morningDiet, eveningDiet } = req.body;
+    const { fromDate, toDate, fromMorning, fromEvening, toMorning, toEvening } = req.body;
     const userId = req.user.id;
     const districtId = req.user.districtId;
 
-    const isMorningSelected = morningDiet !== undefined ? !!morningDiet : true;
-    const isEveningSelected = eveningDiet !== undefined ? !!eveningDiet : true;
+    const isFromMorning = fromMorning !== undefined ? !!fromMorning : true;
+    const isFromEvening = fromEvening !== undefined ? !!fromEvening : true;
+    const isToMorning = toMorning !== undefined ? !!toMorning : true;
+    const isToEvening = toEvening !== undefined ? !!toEvening : true;
 
-    if (!isMorningSelected && !isEveningSelected) {
-      return res.status(400).json({ error: 'At least one session (Morning or Evening) must be selected for the Nil Diet request.' });
+    if (!isFromMorning && !isFromEvening && !isToMorning && !isToEvening) {
+      return res.status(400).json({ error: 'At least one session (Morning or Evening) must be selected for either From Date or Till Date.' });
     }
 
     if (!fromDate || !toDate) {
@@ -58,7 +109,7 @@ async function submitRequest(req, res, next) {
 
     // Today check: Today's morning/evening diets are locked if past their respective cutoffs
     if (fromDate === todayStr) {
-      if (isMorningSelected) {
+      if (isFromMorning) {
         const [cutoffHour, cutoffMin] = morningCutoff.split(':').map(Number);
         const cutoffTime = new Date();
         cutoffTime.setHours(cutoffHour, cutoffMin, 0, 0);
@@ -70,7 +121,7 @@ async function submitRequest(req, res, next) {
         }
       }
 
-      if (isEveningSelected) {
+      if (isFromEvening) {
         const [cutoffHour, cutoffMin] = eveningCutoff.split(':').map(Number);
         const cutoffTime = new Date();
         cutoffTime.setHours(cutoffHour, cutoffMin, 0, 0);
@@ -88,12 +139,16 @@ async function submitRequest(req, res, next) {
       districtId,
       fromDate,
       toDate,
-      morningDiet: isMorningSelected,
-      eveningDiet: isEveningSelected,
+      morningDiet: isFromMorning || isToMorning, // Legacy fallback
+      eveningDiet: isFromEvening || isToEvening, // Legacy fallback
+      fromMorning: isFromMorning,
+      fromEvening: isFromEvening,
+      toMorning: isToMorning,
+      toEvening: isToEvening,
       status: 'pending'
     }).returning();
 
-    await logAudit(userId, 'SUBMIT_NIL_DIET_REQUEST', `Submitted Nil Diet from ${fromDate} to ${toDate} (Morning: ${isMorningSelected}, Evening: ${isEveningSelected})`);
+    await logAudit(userId, 'SUBMIT_NIL_DIET_REQUEST', `Submitted Nil Diet from ${fromDate} to ${toDate} (From Morning/Evening: ${isFromMorning}/${isFromEvening}, Till Morning/Evening: ${isToMorning}/${isToEvening})`);
 
     return res.status(201).json({ message: 'Request submitted successfully!', request: newRequest });
   } catch (error) {
@@ -123,6 +178,10 @@ async function getRequests(req, res, next) {
         toDate: nilDietRequests.toDate,
         morningDiet: nilDietRequests.morningDiet,
         eveningDiet: nilDietRequests.eveningDiet,
+        fromMorning: nilDietRequests.fromMorning,
+        fromEvening: nilDietRequests.fromEvening,
+        toMorning: nilDietRequests.toMorning,
+        toEvening: nilDietRequests.toEvening,
         status: nilDietRequests.status,
         createdAt: nilDietRequests.createdAt,
         memberName: users.fullName,
@@ -140,6 +199,10 @@ async function getRequests(req, res, next) {
         toDate: nilDietRequests.toDate,
         morningDiet: nilDietRequests.morningDiet,
         eveningDiet: nilDietRequests.eveningDiet,
+        fromMorning: nilDietRequests.fromMorning,
+        fromEvening: nilDietRequests.fromEvening,
+        toMorning: nilDietRequests.toMorning,
+        toEvening: nilDietRequests.toEvening,
         status: nilDietRequests.status,
         createdAt: nilDietRequests.createdAt
       })
@@ -204,14 +267,16 @@ async function approveRequest(req, res, next) {
         )
       );
 
+      const { isMorningNil, isEveningNil } = checkNilStatusForDate(d, request);
+
       if (existing) {
         const updateObj = {};
-        if (request.morningDiet) {
+        if (isMorningNil) {
           updateObj.morningNormal = false;
           updateObj.morningHalfSpecial = false;
           updateObj.morningFullSpecial = false;
         }
-        if (request.eveningDiet) {
+        if (isEveningNil) {
           updateObj.eveningNormal = false;
           updateObj.eveningHalfSpecial = false;
           updateObj.eveningFullSpecial = false;

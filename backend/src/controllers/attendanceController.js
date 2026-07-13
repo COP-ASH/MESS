@@ -3,6 +3,56 @@ const { mealAttendance, nilDietRequests } = require('../db/schema');
 const { eq, and, sql } = require('drizzle-orm');
 const { logAudit } = require('../utils/logger');
 
+// Date-specific Nil check helper function
+function formatDateStr(d) {
+  if (!d) return '';
+  if (typeof d === 'string') {
+    const parts = d.split('T')[0].split('-');
+    if (parts.length === 3) {
+      return `${parts[0]}-${parts[1]}-${parts[2]}`;
+    }
+  }
+  const dateObj = new Date(d);
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function checkNilStatusForDate(dateStr, request) {
+  const date = formatDateStr(dateStr);
+  const from = formatDateStr(request.fromDate);
+  const to = formatDateStr(request.toDate);
+
+  let isMorningNil = false;
+  let isEveningNil = false;
+
+  // Fallback for legacy requests (where new columns are null/undefined)
+  if (request.fromMorning === undefined || request.fromMorning === null) {
+    if (date >= from && date <= to) {
+      isMorningNil = !!request.morningDiet;
+      isEveningNil = !!request.eveningDiet;
+    }
+    return { isMorningNil, isEveningNil };
+  }
+
+  if (date === from && date === to) {
+    isMorningNil = !!request.fromMorning;
+    isEveningNil = !!request.fromEvening;
+  } else if (date === from) {
+    isMorningNil = !!request.fromMorning;
+    isEveningNil = !!request.fromEvening;
+  } else if (date === to) {
+    isMorningNil = !!request.toMorning;
+    isEveningNil = !!request.toEvening;
+  } else if (date > from && date < to) {
+    isMorningNil = true;
+    isEveningNil = true;
+  }
+
+  return { isMorningNil, isEveningNil };
+}
+
 /**
  * Mark or update meal attendance for a specific date
  */
@@ -57,10 +107,11 @@ async function markAttendance(req, res, next) {
     );
 
     if (activeNil) {
-      if (activeNil.morningDiet && (morningNormal === true || morningHalfSpecial === true || morningFullSpecial === true)) {
+      const { isMorningNil, isEveningNil } = checkNilStatusForDate(date, activeNil);
+      if (isMorningNil && (morningNormal === true || morningHalfSpecial === true || morningFullSpecial === true)) {
         return res.status(400).json({ error: 'Cannot mark Morning diet: This member has an approved Nil Diet request active for the Morning session on this date.' });
       }
-      if (activeNil.eveningDiet && (eveningNormal === true || eveningHalfSpecial === true || eveningFullSpecial === true)) {
+      if (isEveningNil && (eveningNormal === true || eveningHalfSpecial === true || eveningFullSpecial === true)) {
         return res.status(400).json({ error: 'Cannot mark Evening diet: This member has an approved Nil Diet request active for the Evening session on this date.' });
       }
     }
@@ -171,9 +222,10 @@ async function getDailyAttendanceSummary(req, res, next) {
 
     const nilMap = {};
     approvedNilRequests.forEach(nr => {
+      const { isMorningNil, isEveningNil } = checkNilStatusForDate(targetDate, nr);
       nilMap[nr.userId] = {
-        morningDiet: nr.morningDiet,
-        eveningDiet: nr.eveningDiet
+        morningDiet: isMorningNil,
+        eveningDiet: isEveningNil
       };
     });
 

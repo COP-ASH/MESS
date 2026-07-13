@@ -223,23 +223,30 @@
             <div class="form-group">
               <label for="nilFromDate" class="form-label">From Date</label>
               <input type="text" id="nilFromDate" class="form-input" placeholder="Select Start Date" required>
-            </div>
-            <div class="form-group">
-              <label for="nilToDate" class="form-label">Till Date</label>
-              <input type="text" id="nilToDate" class="form-input" placeholder="Select End Date" required>
-            </div>
-            <div class="form-group" style="margin-top: 1.25rem; margin-bottom: 1.25rem;">
-              <label class="form-label" style="margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 600;">Select Sessions</label>
-              <div style="display: flex; gap: 1.5rem; align-items: center;">
-                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);">
-                  <input type="checkbox" id="nilMorningDiet" style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: var(--accent-color);" checked> Morning
+              <div style="display: flex; gap: 1.2rem; align-items: center; margin-top: 0.6rem; padding-left: 0.25rem;">
+                <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 60px;">Sessions:</span>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilFromMorning" style="width: 1.1rem; height: 1.1rem; cursor: pointer; accent-color: var(--accent-color);" checked> Morning
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);">
-                  <input type="checkbox" id="nilEveningDiet" style="width: 1.2rem; height: 1.2rem; cursor: pointer; accent-color: var(--accent-color);" checked> Evening
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilFromEvening" style="width: 1.1rem; height: 1.1rem; cursor: pointer; accent-color: var(--accent-color);" checked> Evening
                 </label>
               </div>
             </div>
-            <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 1rem;">Submit Request</button>
+            <div class="form-group" style="margin-top: 1.5rem;">
+              <label for="nilToDate" class="form-label">Till Date</label>
+              <input type="text" id="nilToDate" class="form-input" placeholder="Select End Date" required>
+              <div style="display: flex; gap: 1.2rem; align-items: center; margin-top: 0.6rem; padding-left: 0.25rem;">
+                <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; min-width: 60px;">Sessions:</span>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilToMorning" style="width: 1.1rem; height: 1.1rem; cursor: pointer; accent-color: var(--accent-color);" checked> Morning
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                  <input type="checkbox" id="nilToEvening" style="width: 1.1rem; height: 1.1rem; cursor: pointer; accent-color: var(--accent-color);" checked> Evening
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 1.5rem;">Submit Request</button>
           </form>
         </div>
 
