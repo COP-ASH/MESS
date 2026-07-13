@@ -25,10 +25,10 @@
   <header>
     <nav class="navbar">
       <div class="nav-brand" id="adminDistrictHeader">👮 DISTRICT ADMIN PORTAL</div>
-      <ul class="nav-links">
+      <ul class="nav-links" style="flex-direction: column; align-items: flex-end; gap: 0.15rem;">
         <li style="color: var(--text-secondary); font-size: 0.9rem;" id="userGreeting">Loading District Profile...</li>
-        <li style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.85; border-left: 1px solid var(--glass-border); padding-left: 1rem;" id="currentTimeDisplay">--:--</li>
-        <li><button class="btn btn-accent" id="btnLogout" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Logout</button></li>
+        <li style="color: var(--text-secondary); font-size: 0.85rem; opacity: 0.85;" id="currentTimeDisplay">--:--</li>
+        <li><button class="btn btn-accent" id="btnLogout" style="padding: 0.3rem 0.7rem; font-size: 0.8rem; margin-top: 0.1rem;">Logout</button></li>
       </ul>
     </nav>
   </header>
@@ -221,13 +221,13 @@
             <thead>
               <tr>
                   <th>Day</th>
+                  <th>Action</th>
                   <th style="text-align: center;">Morning Normal</th>
                   <th style="text-align: center;">Evening Normal</th>
                   <th style="text-align: center;">Morning HalfSpecial</th>
                   <th style="text-align: center;">Evening HalfSpecial</th>
                   <th style="text-align: center;">Morning FullSpecial</th>
                   <th style="text-align: center;">Evening FullSpecial</th>
-                  <th>Action</th>
               </tr>
             </thead>
             <tbody id="adminMenuTableBody">

@@ -1230,6 +1230,18 @@ function initDistrictDashboard() {
     const eveningHalfSpecial = document.getElementById('adminAttendEveningHalfSpecial').checked;
     const eveningFullSpecial = document.getElementById('adminAttendEveningFullSpecial').checked;
 
+    // Validate: only one meal type per session
+    const morningCount = [morningNormal, morningHalfSpecial, morningFullSpecial].filter(Boolean).length;
+    const eveningCount = [eveningNormal, eveningHalfSpecial, eveningFullSpecial].filter(Boolean).length;
+    if (morningCount > 1) {
+      showNotification('Please select only one meal type for Morning session.', 'error');
+      return;
+    }
+    if (eveningCount > 1) {
+      showNotification('Please select only one meal type for Evening session.', 'error');
+      return;
+    }
+
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/api/attendance`, {
         method: 'POST',
@@ -1577,12 +1589,44 @@ async function fetchAndSetAdminAttendance(userId, date) {
       const history = await response.json();
       const record = history.find(r => r.date.split('T')[0] === date);
       if (record) {
-        if (chkMorningNormal && !isMorningNil) chkMorningNormal.checked = !!record.morningNormal;
-        if (chkMorningHalfSpecial && !isMorningNil) chkMorningHalfSpecial.checked = !!record.morningHalfSpecial;
-        if (chkMorningFullSpecial && !isMorningNil) chkMorningFullSpecial.checked = !!record.morningFullSpecial;
-        if (chkEveningNormal && !isEveningNil) chkEveningNormal.checked = !!record.eveningNormal;
-        if (chkEveningHalfSpecial && !isEveningNil) chkEveningHalfSpecial.checked = !!record.eveningHalfSpecial;
-        if (chkEveningFullSpecial && !isEveningNil) chkEveningFullSpecial.checked = !!record.eveningFullSpecial;
+        if (!isMorningNil) {
+          // Enforce mutual exclusion: only allow one morning meal type
+          const morningValues = [
+            { chk: chkMorningNormal, val: !!record.morningNormal },
+            { chk: chkMorningHalfSpecial, val: !!record.morningHalfSpecial },
+            { chk: chkMorningFullSpecial, val: !!record.morningFullSpecial }
+          ];
+          let morningSet = false;
+          morningValues.forEach(item => {
+            if (item.chk) {
+              if (item.val && !morningSet) {
+                item.chk.checked = true;
+                morningSet = true;
+              } else {
+                item.chk.checked = false;
+              }
+            }
+          });
+        }
+        if (!isEveningNil) {
+          // Enforce mutual exclusion: only allow one evening meal type
+          const eveningValues = [
+            { chk: chkEveningNormal, val: !!record.eveningNormal },
+            { chk: chkEveningHalfSpecial, val: !!record.eveningHalfSpecial },
+            { chk: chkEveningFullSpecial, val: !!record.eveningFullSpecial }
+          ];
+          let eveningSet = false;
+          eveningValues.forEach(item => {
+            if (item.chk) {
+              if (item.val && !eveningSet) {
+                item.chk.checked = true;
+                eveningSet = true;
+              } else {
+                item.chk.checked = false;
+              }
+            }
+          });
+        }
       }
     }
   } catch (err) {
@@ -2052,15 +2096,15 @@ async function loadAdminMenuTable() {
         tbody.innerHTML += `
           <tr>
             <td><strong>${m.dayOfWeek}</strong></td>
+            <td>
+              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="editMenu(${m.id}, '${m.dayOfWeek}', '${m.morningNormal.replace(/'/g, "\\'")}', '${m.morningHalfSpecial.replace(/'/g, "\\'")}', '${m.morningFullSpecial.replace(/'/g, "\\'")}', '${m.eveningNormal.replace(/'/g, "\\'")}', '${m.eveningHalfSpecial.replace(/'/g, "\\'")}', '${m.eveningFullSpecial.replace(/'/g, "\\'")}')">Edit</button>
+            </td>
             <td style="text-align: center;">${m.morningNormal}</td>
             <td style="text-align: center;">${m.eveningNormal}</td>
             <td style="text-align: center;">${m.morningHalfSpecial}</td>
             <td style="text-align: center;">${m.eveningHalfSpecial}</td>
             <td style="text-align: center;">${m.morningFullSpecial}</td>
             <td style="text-align: center;">${m.eveningFullSpecial}</td>
-            <td>
-              <button class="btn btn-accent" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="editMenu(${m.id}, '${m.dayOfWeek}', '${m.morningNormal.replace(/'/g, "\\'")}', '${m.morningHalfSpecial.replace(/'/g, "\\'")}', '${m.morningFullSpecial.replace(/'/g, "\\'")}', '${m.eveningNormal.replace(/'/g, "\\'")}', '${m.eveningHalfSpecial.replace(/'/g, "\\'")}', '${m.eveningFullSpecial.replace(/'/g, "\\'")}')">Edit</button>
-            </td>
           </tr>
         `;
       });
