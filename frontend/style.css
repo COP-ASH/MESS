@@ -1110,7 +1110,7 @@ body.auth-page footer {
   max-width: 500px;
   text-align: center;
   z-index: 2;
-  margin-top: -6rem;
+  margin-top: -1rem;
 }
 
 .left-content h1 {
@@ -1363,12 +1363,12 @@ body.auth-page footer {
     flex: none !important;
   }
 
-  body.dashboard-page .tab-content.active > .glass-panel {
+  body.dashboard-page .tab-content.active>.glass-panel {
     overflow: visible !important;
     flex: none !important;
   }
 
-  body.dashboard-page .tab-content.active > .glass-panel .table-responsive {
+  body.dashboard-page .tab-content.active>.glass-panel .table-responsive {
     max-height: 400px !important;
   }
 
@@ -1686,12 +1686,12 @@ body.auth-page footer {
   }
 
   /* Bills & Rates side-by-side panels */
-  #tabBills > div[style*="grid-template-columns"] {
+  #tabBills>div[style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
   }
 
   /* Flex row buttons to stack vertically */
-  div[style*="display: flex"][style*="gap: 1rem"] > .btn {
+  div[style*="display: flex"][style*="gap: 1rem"]>.btn {
     width: 100%;
   }
 
@@ -1745,8 +1745,8 @@ body.auth-page footer {
   }
 
   /* Filter/date row controls */
-  div[style*="display: flex"][style*="align-items: center"] > input[type="text"],
-  div[style*="display: flex"][style*="align-items: center"] > .form-input {
+  div[style*="display: flex"][style*="align-items: center"]>input[type="text"],
+  div[style*="display: flex"][style*="align-items: center"]>.form-input {
     width: 100% !important;
     min-width: 0 !important;
   }
@@ -1926,4 +1926,4 @@ body.auth-page footer {
   .modal {
     padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
   }
-}
+}
