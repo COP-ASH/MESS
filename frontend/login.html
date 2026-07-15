@@ -7,6 +7,153 @@
   <title>Portal Secure Login - Mess Management</title>
   <meta name="description" content="Secure login for Mess Management Portal.">
   <link rel="stylesheet" href="style.css?v=4.2">
+  <style>
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 8px 2px rgba(204,0,0,0.35), 0 0 20px 4px rgba(0,48,135,0.2); }
+      50%       { box-shadow: 0 0 16px 6px rgba(204,0,0,0.55), 0 0 35px 10px rgba(0,48,135,0.35); }
+    }
+    @keyframes blinkDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.3; transform: scale(0.7); }
+    }
+    @keyframes shineSweep {
+      0%   { left: -60%; }
+      100% { left: 130%; }
+    }
+    .police-title-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(270deg, #b5a642, #cc0000, #003087, #b5a642);
+      background-size: 300% 300%;
+      animation: gradientShift 3.5s ease infinite, pulseGlow 2s ease-in-out infinite;
+      border-radius: 50px;
+      padding: 0.3rem 0.9rem 0.3rem 0.65rem;
+      border: 1.5px solid rgba(255,255,255,0.3);
+    }
+    .police-title-badge::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -60%;
+      width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shineSweep 2.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .police-title-text {
+      font-size: 0.919rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.3px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .police-blink-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      flex-shrink: 0;
+      animation: blinkDot 1.2s ease-in-out infinite;
+      box-shadow: 0 0 6px 2px rgba(255,255,255,0.7);
+    }
+    /* Credentials Card */
+    @keyframes borderRotate {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes cardGlow {
+      0%, 100% { box-shadow: 0 0 10px 2px rgba(181,166,66,0.4), 0 0 25px 5px rgba(204,0,0,0.2); }
+      50%       { box-shadow: 0 0 20px 6px rgba(204,0,0,0.5), 0 0 40px 12px rgba(0,48,135,0.3); }
+    }
+    @keyframes cardShine {
+      0%   { left: -80%; }
+      100% { left: 140%; }
+    }
+    @keyframes floatBadge {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-2px); }
+    }
+    .cred-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(0,48,135,0.55), rgba(204,0,0,0.3), rgba(181,166,66,0.25));
+      background-size: 300% 300%;
+      animation: borderRotate 4s ease infinite, cardGlow 2.5s ease-in-out infinite;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      margin: 0 1.5rem;
+      border: 1.5px solid rgba(255,255,255,0.25);
+      text-align: center;
+    }
+    .cred-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(181,166,66,0.08), rgba(204,0,0,0.06), rgba(0,48,135,0.08));
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    .cred-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -80%;
+      width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      animation: cardShine 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .cred-for-testing-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: linear-gradient(90deg, #b5a642, #cc0000, #003087);
+      background-size: 200% 200%;
+      animation: borderRotate 3s ease infinite, floatBadge 2s ease-in-out infinite;
+      border-radius: 50px;
+      padding: 0.18rem 0.65rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.6rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 10px rgba(204,0,0,0.4);
+    }
+    .cred-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #fff;
+      animation: blinkDot 1s ease-in-out infinite;
+      box-shadow: 0 0 4px rgba(255,255,255,0.8);
+    }
+    .cred-row {
+      position: relative;
+      z-index: 1;
+      padding: 0.22rem 0.4rem;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .cred-row:hover { background: rgba(255,255,255,0.08); }
+    .cred-label-super  { font-weight: 700; color: #ffffff; font-size: 0.775rem; }
+    .cred-label-da     { font-weight: 700; color: #fbbf24; font-size: 0.725rem; }
+    .cred-label-user   { font-weight: 700; color: #86efac; font-size: 0.725rem; }
+    .cred-code {
+      font-family: monospace;
+      font-size: 0.78rem;
+      background: rgba(0,0,0,0.3);
+      padding: 0.08rem 0.3rem;
+      border-radius: 4px;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+  </style>
 </head>
 
 <body class="auth-page">
@@ -28,19 +175,41 @@
         
         <!-- 3. Description (Centered/Justified Layout) -->
         <p class="left-description" style="text-align: justify; line-height: 1.5; font-size: 0.875rem; font-weight: 500; margin-bottom: 1.25rem; color: rgba(255, 255, 255, 0.85); padding: 0 1.5rem;">
-          <span style="display: block; text-align: center; margin-bottom: 0.5rem;"><strong>UP Police Mess Management Project</strong></span>
+          <span style="display: block; text-align: center; margin-bottom: 0.75rem;">
+            <span class="police-title-badge">
+              <span class="police-blink-dot"></span>
+              <span class="police-title-text">UP Police Mess Management Project</span>
+            </span>
+          </span>
           &emsp;&emsp;A secure, efficient, and digitalized platform designed to streamline daily mess registrations, menu schedules, attendance logs, and monthly bills for police personnel. The purpose of this project is to ensure that all police personnel serving in police lines and police stations across Uttar Pradesh receive high‑quality meals, with regular monitoring and supervision of food standards. Guided by the principle that a healthy body contributes to building a healthy society, the system emphasizes transparency, accountability, and improved well‑being for those who serve.
         </p>
 
-        <!-- 4. Ultra Compact Testing Credentials Card (placed below description, centered) -->
-        <div style="background: rgba(255, 255, 255, 0.06); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; text-align: center; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); margin-right: 1.5rem; margin-left: 1.5rem;">
-          <div style="margin-bottom: 0.25rem; display: flex; justify-content: center;">
-            <strong style="color: #fbbf24; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.5px;">For Testing</strong>
+        <!-- 4. Animated Credentials Card -->
+        <div class="cred-card">
+          <div style="display: flex; justify-content: center; margin-bottom: 0.1rem;">
+            <span class="cred-for-testing-badge">
+              <span class="cred-dot"></span>
+              For Testing
+            </span>
           </div>
-          <div style="font-size: 0.775rem; color: #ffffff; line-height: 1.45; text-align: left;">
-            <span style="font-weight: 700; color: #ffffff; margin-right: 0.25rem;">Super Admin:</span> <code style="font-family: monospace; font-size: 0.8rem; background: rgba(0, 0, 0, 0.25); padding: 0.1rem 0.3rem; border-radius: 3px; color: #ffffff; margin-right: 0.25rem;">superadmin@copash.shop</code> / <code style="font-family: monospace; font-size: 0.8rem; background: rgba(0, 0, 0, 0.25); padding: 0.1rem 0.3rem; border-radius: 3px; color: #ffffff;">Admin@123</code>
-            <div style="margin-top: 0.25rem; font-size: 0.725rem; color: rgba(255, 255, 255, 0.65);">
-              <span style="font-weight: 700; color: #f59e0b; margin-right: 0.25rem;">District Admin:</span> Diet Management operates at District Level. Create a new account to test.
+          <div style="position: relative; z-index: 1;">
+            <div class="cred-row">
+              <span class="cred-label-super">Super Admin:</span>
+              <code class="cred-code">superadmin@copash.shop</code>
+              <span style="color:rgba(255,255,255,0.5); margin: 0 0.15rem;">/</span>
+              <code class="cred-code">Admin@123</code>
+            </div>
+            <div class="cred-row" style="margin-top: 0.2rem;">
+              <span class="cred-label-da">District Admin:</span>
+              <code class="cred-code">vicky.nick1991@gmail.com</code>
+              <span style="color:rgba(255,255,255,0.5); margin: 0 0.15rem;">/</span>
+              <code class="cred-code">abcdef</code>
+            </div>
+            <div class="cred-row" style="margin-top: 0.2rem;">
+              <span class="cred-label-user">For Testing User:</span>
+              <code class="cred-code">vicky.nick1997@gmail.com</code>
+              <span style="color:rgba(255,255,255,0.5); margin: 0 0.15rem;">/</span>
+              <code class="cred-code">abcdef</code>
             </div>
           </div>
         </div>

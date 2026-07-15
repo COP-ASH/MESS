@@ -190,13 +190,19 @@ async function getDailyAttendanceSummary(req, res, next) {
   const { users } = require('../db/schema');
 
   try {
-    let memberQuery = db.select().from(users).where(eq(users.role, 'user'));
+    let memberQuery = db.select().from(users).where(
+      and(
+        eq(users.role, 'user'),
+        eq(users.isActive, true)
+      )
+    );
     let attendanceQuery = db.select().from(mealAttendance).where(eq(mealAttendance.date, targetDate));
 
     if (req.user.role === 'district_admin') {
       memberQuery = db.select().from(users).where(
         and(
           eq(users.role, 'user'),
+          eq(users.isActive, true),
           eq(users.districtId, req.user.districtId)
         )
       );
