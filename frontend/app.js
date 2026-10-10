@@ -1394,10 +1394,10 @@ async function loadDistrictDashboardStats() {
       document.getElementById('statInactiveUsers').innerText = data.inactiveUsers;
 
       if (document.getElementById('rateMorningCutoff')) {
-        document.getElementById('rateMorningCutoff').value = data.district.morningCutoff || '20:00';
+        document.getElementById('rateMorningCutoff').value = data.district.morningCutoff || '06:00';
       }
       if (document.getElementById('rateEveningCutoff')) {
-        document.getElementById('rateEveningCutoff').value = data.district.eveningCutoff || '12:00';
+        document.getElementById('rateEveningCutoff').value = data.district.eveningCutoff || '15:00';
       }
 
       // Compile recent registrations

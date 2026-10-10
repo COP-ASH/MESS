@@ -21,8 +21,13 @@ async function seedDatabase() {
     console.log('>>> [DB SEED] Ensuring cutoff columns exist in districts and nil_diet_requests...');
     await db.execute(require('drizzle-orm').sql`
       ALTER TABLE districts 
-      ADD COLUMN IF NOT EXISTS morning_cutoff VARCHAR(5) DEFAULT '20:00',
-      ADD COLUMN IF NOT EXISTS evening_cutoff VARCHAR(5) DEFAULT '12:00';
+      ADD COLUMN IF NOT EXISTS morning_cutoff VARCHAR(5) DEFAULT '06:00',
+      ADD COLUMN IF NOT EXISTS evening_cutoff VARCHAR(5) DEFAULT '15:00';
+      ALTER TABLE districts 
+      ALTER COLUMN morning_cutoff SET DEFAULT '06:00',
+      ALTER COLUMN evening_cutoff SET DEFAULT '15:00';
+      UPDATE districts SET morning_cutoff = '06:00' WHERE morning_cutoff = '20:00' OR morning_cutoff IS NULL;
+      UPDATE districts SET evening_cutoff = '15:00' WHERE evening_cutoff = '12:00' OR evening_cutoff IS NULL;
     `);
     await db.execute(require('drizzle-orm').sql`
       ALTER TABLE nil_diet_requests

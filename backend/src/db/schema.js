@@ -7,8 +7,8 @@ const districts = pgTable('districts', {
   districtCode: text('district_code').unique().notNull(),
   adminId: integer('admin_id'), // Set after creating district admin (circular reference handled lazily)
   status: text('status').default('active').notNull(), // 'active', 'inactive'
-  morningCutoff: text('morning_cutoff').default('20:00').notNull(),
-  eveningCutoff: text('evening_cutoff').default('12:00').notNull(),
+  morningCutoff: text('morning_cutoff').default('06:00').notNull(),
+  eveningCutoff: text('evening_cutoff').default('15:00').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
